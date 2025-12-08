@@ -320,6 +320,20 @@ class VideoPlayerWidget(QWidget):
         self.btn_next = QPushButton("⏭")
         self.btn_next.setToolTip("Кадр вперед")
 
+        self.btn_turbo = QPushButton(">>")
+        self.btn_turbo.setCheckable(True)  # Кнопка с фиксацией
+        self.btn_turbo.setToolTip("Максимальная скорость")
+        self.btn_turbo.setFixedSize(40, 40)
+        self.btn_turbo.setCursor(Qt.PointingHandCursor)
+        self.btn_turbo.toggled.connect(self.toggle_turbo)
+
+        # Стиль для активного состояния
+        self.btn_turbo.setStyleSheet("""
+                    QPushButton { background-color: transparent; border: 1px solid #666; border-radius: 4px; color: #fff; font-size: 16px; }
+                    QPushButton:checked { background-color: #d4b765; border: 1px solid #d4b765; color: black; }
+                    QPushButton:hover { background-color: rgba(255,255,255,0.1); }
+                """)
+
         # Добавляем и задаем размер
         for btn in [self.btn_prev, self.btn_play, self.btn_next]:
             btn.setFixedSize(40, 40)
@@ -327,12 +341,17 @@ class VideoPlayerWidget(QWidget):
             cont_layout.addWidget(btn)
 
         cont_layout.addStretch()  # Пружина справа
+        cont_layout.addWidget(self.btn_turbo)
         self.layout.addWidget(self.controls_container)
 
         # --- ПОДКЛЮЧЕНИЕ ---
         self.btn_prev.clicked.connect(self.step_backward)  # Новый слот
         self.btn_play.clicked.connect(self.toggle_play_pause)
         self.btn_next.clicked.connect(self.step_forward)
+
+    @Slot(bool)
+    def toggle_turbo(self, checked):
+        self.thread.set_turbo_mode(checked)
 
     @Slot()
     def step_backward(self):

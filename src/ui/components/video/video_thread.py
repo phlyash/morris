@@ -26,10 +26,12 @@ class VideoThread(QThread):
         self.cap = cv2.VideoCapture(self.video.path)
         self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        self.fps = self.cap.get(cv2.CAP_PROP_FPS)
-        if self.fps == 0 or np.isnan(self.fps):
-            self.fps = 30
-        self.delay = int(1000 / self.fps)
+        self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30
+        self.normal_delay = int(1000 / self.fps)
+        self.turbo_delay = 1  # Минимальная задержка
+
+        self.current_delay = self.normal_delay
+        self.is_turbo = False
 
         self.tracker = None
         self.is_tracking_active = False
@@ -37,6 +39,10 @@ class VideoThread(QThread):
         self.is_model_loading = False
 
         self.tracking_data = {}
+
+    def set_turbo_mode(self, enabled: bool):
+        self.is_turbo = enabled
+        self.current_delay = self.turbo_delay if enabled else self.normal_delay
 
     def set_tracker_model(self, model_name: str):
         if model_name not in ["CSRT", "YOLO"]:
@@ -175,7 +181,7 @@ class VideoThread(QThread):
                 self.msleep(50)
 
             if not self.is_paused:
-                self.msleep(self.delay)
+                self.msleep(self.current_delay)
 
     def seek(self, frame_index):
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)

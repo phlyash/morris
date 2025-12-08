@@ -244,7 +244,6 @@ class VideoTimelineWidget(QFrame):
         self.list_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.list_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.list_view.setIconSize(QSize(self.thumb_w, self.thumb_h))
-        self.list_view.setGridSize(QSize(self.thumb_w + 10, self.thumb_h + 10))
         self.list_view.setUniformItemSizes(True)
         self.list_view.setSpacing(0)
 
@@ -275,7 +274,7 @@ class VideoTimelineWidget(QFrame):
             flag = QItemSelectionModel.SelectionFlag.ClearAndSelect
             self.list_view.selectionModel().select(idx, flag)
             self.list_view.scrollTo(idx, QAbstractItemView.ScrollHint.PositionAtCenter)
-            self.model.prefetch(frame_index, look_ahead=30)
+            self.model.prefetch(frame_index, look_ahead=6)
 
     def on_scroll(self, value):
         item_width = self.thumb_w

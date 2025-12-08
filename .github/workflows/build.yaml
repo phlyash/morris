@@ -1,0 +1,102 @@
+name: Build Morris App
+
+on:
+  push:
+    tags:
+      - 'v*' # Сборка запускается при пуше тега (например v1.0)
+  workflow_dispatch: # Или вручную через интерфейс GitHub
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows
+          - os: windows-latest
+            artifact_name: Morris-Windows-x64
+            sep: '\'
+
+          # Linux
+          - os: ubuntu-latest
+            artifact_name: Morris-Linux-x64
+            sep: '/'
+
+          # MacOS Intel
+          - os: macos-13
+            artifact_name: Morris-MacOS-Intel
+            sep: '/'
+
+          # MacOS Silicon (M1/M2)
+          - os: macos-14
+            artifact_name: Morris-MacOS-Silicon
+            sep: '/'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # Установка зависимостей для Linux (нужно для сборки Qt)
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libxkbcommon-x11-0 libdbus-1-3 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0 x11-utils
+
+      - name: Install Python requirements
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      # Проверка наличия модели (чтобы не собрать битый билд)
+      - name: Check for Model
+        shell: bash
+        run: |
+          if [ ! -f resources/best.pt ]; then
+            echo "Error: resources/best.pt not found!"
+            exit 1
+          fi
+
+      # Сборка. Запускаем из корня, указывая путь к spec
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --clean --noconfirm scripts${{ matrix.sep }}build.spec
+
+      # --- УПАКОВКА ---
+
+      # Windows: ZIP
+      - name: Zip Windows Build
+        if: runner.os == 'Windows'
+        run: |
+          Compress-Archive -Path dist\Morris -DestinationPath dist\Morris-Windows.zip
+
+      # MacOS: TAR (для .app бандла)
+      - name: Archive MacOS Build
+        if: runner.os == 'macOS'
+        run: |
+          cd dist
+          tar -czf ${{ matrix.artifact_name }}.tar.gz Morris.app
+
+      # Linux: TAR
+      - name: Archive Linux Build
+        if: runner.os == 'Linux'
+        run: |
+          cd dist
+          tar -czf ${{ matrix.artifact_name }}.tar.gz Morris
+
+      # --- ЗАГРУЗКА АРТЕФАКТОВ ---
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            dist/*.zip
+            dist/*.tar.gz

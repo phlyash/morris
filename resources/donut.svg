@@ -1,0 +1,21 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <mask id="circleMask">
+      <rect width="48" height="48" fill="white"/>
+      <circle cx="23.9999" cy="23.9999" r="11.1034" fill="black"/>
+    </mask>
+  </defs>
+
+  <circle cx="24" cy="24" r="23" stroke="#CECECE" stroke-width="2"/>
+
+  <g mask="url(#circleMask)">
+    <path d="M2.76953 28.1486L28.1488 2.76929" stroke="#CECECE" stroke-width="2" stroke-linecap="round"/>
+    <path d="M3.51465 19.2415L19.3767 3.37939" stroke="#CECECE" stroke-width="2" stroke-linecap="round"/>
+    <path d="M20.4614 45.0476L45.0476 20.4614" stroke="#CECECE" stroke-width="2" stroke-linecap="round"/>
+    <path d="M28.8936 44.6209L44.7556 28.7588" stroke="#CECECE" stroke-width="2" stroke-linecap="round"/>
+    <path d="M14.6182 42.2415L42.3768 14.4829" stroke="#CECECE" stroke-width="2" stroke-linecap="round"/>
+    <path d="M5.89355 33.5174L33.6522 5.75879" stroke="#CECECE" stroke-width="2" stroke-linecap="round"/>
+    <path d="M9.85986 38.2758L38.4116 9.72412" stroke="#CECECE" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <circle cx="23.9999" cy="23.9999" r="11.1034" fill="none" stroke="#CECECE" stroke-width="2"/>
+</svg>

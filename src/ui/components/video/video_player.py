@@ -2,16 +2,53 @@ import math
 
 import cv2
 import numpy as np
-from PySide6.QtCore import Qt, Slot, QPoint, Signal
-from PySide6.QtGui import QImage, QPixmap, QResizeEvent, QPen, QPainter
+from PySide6.QtCore import Qt, Slot, QPoint, Signal, QSize
+from PySide6.QtGui import QImage, QPixmap, QResizeEvent, QPen, QPainter, QIcon, QColor
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                                QPushButton, QLabel, QSizePolicy, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
                                QGraphicsRectItem)
 
+from src.config import get_resource_path
 from src.core import Video
 from src.ui.components.video.graphics_items import EditableGeometryItem
 from src.ui.components.video.video_thread import VideoThread
 from src.ui.components.video.video_view import VideoGraphicsView
+
+
+def svg_to_pixmap(svg_path: str, width: int, height: int) -> QPixmap:
+    renderer = QSvgRenderer(svg_path)
+    pixmap = QPixmap(width, height)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    renderer.render(painter)
+    painter.end()
+    return pixmap
+
+
+def recolor_pixmap(pixmap: QPixmap, color_hex: str) -> QPixmap:
+    if pixmap.isNull(): return pixmap
+    target = QPixmap(pixmap.size())
+    target.fill(Qt.transparent)
+    painter = QPainter(target)
+    if painter.isActive():
+        painter.drawPixmap(0, 0, pixmap)
+        painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
+        painter.fillRect(target.rect(), QColor(color_hex))
+        painter.end()
+    return target
+
+
+def create_icon(path: str, color: str = "#FFFFFF", size: int = 32) -> QIcon:
+    """Создает QIcon из SVG заданного цвета"""
+    try:
+        full_path = str(get_resource_path(path))
+        pix = svg_to_pixmap(full_path, size, size)
+        pix = recolor_pixmap(pix, color)
+        return QIcon(pix)
+    except Exception as e:
+        print(f"Error loading icon {path}: {e}")
+        return QIcon()
 
 
 class VideoScreen(QGraphicsView):
@@ -255,6 +292,16 @@ class VideoPlayerWidget(QWidget):
         super().__init__(parent)
         self.video = video
 
+        # Предзагрузка иконок (чтобы не создавать каждый раз)
+        # Цвета: Белый для обычного состояния, Черный для активного Turbo (на желтом фоне)
+        self.icon_play = create_icon("play.svg")
+        self.icon_pause = create_icon("pause.svg")
+        self.icon_prev = create_icon("backward.svg")
+        self.icon_next = create_icon("forward.svg")
+
+        self.icon_turbo_white = create_icon("fastforward.svg", "#FFFFFF")
+        self.icon_turbo_black = create_icon("fastforward.svg", "#000000")
+
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
@@ -266,110 +313,113 @@ class VideoPlayerWidget(QWidget):
         self._init_controls()
 
         self.thread = VideoThread(self.video)
-
         self.thread.change_pixmap_signal.connect(self.view.update_image)
         self.thread.tracker_update_signal.connect(self.view.update_tracker_box)
         self.thread.frame_changed_signal.connect(self.position_changed.emit)
         self.thread.tracker_loading_signal.connect(self.on_tracker_loading)
+        self.thread.tracking_error_signal.connect(self.on_tracking_error)
 
         self.thread.is_paused = True
         self.thread.start()
 
         self._apply_styles()
         self.seek_to_frame(0)
-        self.thread.tracking_error_signal.connect(self.on_tracking_error)
-
-    @Slot(str)
-    def on_tracking_error(self, message):
-        """
-        Слот, вызываемый потоком, когда трекер потерял объект во время воспроизведения.
-        """
-        # Обновляем кнопку Play (так как поток сам поставил себя на паузу)
-        self.btn_play.setText("▶")
-
-        # Пробрасываем ошибку дальше в сайдбар
-        self.error_occurred.emit(message)
-
-    def seek_to_frame(self, frame_index):
-        self.thread.seek(frame_index)
-        # После перемотки обновляем иконку, так как seek ставит на паузу (обычно)
-        # Но здесь мы просто синхронизируем UI, если вдруг поток сам встал на паузу
-        if self.thread.is_paused:
-            self.btn_play.setText("▶")
 
     def _init_controls(self):
         self.controls_container = QWidget()
         self.controls_container.setFixedHeight(60)
         self.controls_container.setObjectName("ControlsContainer")
 
-        # Используем QHBoxLayout для расположения кнопок в ряд
         cont_layout = QHBoxLayout(self.controls_container)
-        cont_layout.addStretch()  # Пружина слева
+        cont_layout.setContentsMargins(0, 0, 0, 0)
+        cont_layout.addStretch()
 
-        # --- КНОПКИ ---
-
-        # 1. Кадр назад
-        self.btn_prev = QPushButton("⏮")
+        # 2. PREV
+        self.btn_prev = QPushButton()
+        self.btn_prev.setIcon(self.icon_prev)
         self.btn_prev.setToolTip("Кадр назад")
 
-        # 2. Пауза / Воспроизведение
-        self.btn_play = QPushButton("▶")  # По умолчанию Play
+        # 3. PLAY / PAUSE
+        self.btn_play = QPushButton()
+        self.btn_play.setIcon(self.icon_play)
         self.btn_play.setToolTip("Старт / Пауза")
 
-        # 3. Кадр вперед
-        self.btn_next = QPushButton("⏭")
+        # 4. NEXT
+        self.btn_next = QPushButton()
+        self.btn_next.setIcon(self.icon_next)
         self.btn_next.setToolTip("Кадр вперед")
 
-        self.btn_turbo = QPushButton(">>")
-        self.btn_turbo.setCheckable(True)  # Кнопка с фиксацией
-        self.btn_turbo.setToolTip("Максимальная скорость")
-        self.btn_turbo.setFixedSize(40, 40)
-        self.btn_turbo.setCursor(Qt.PointingHandCursor)
-        self.btn_turbo.toggled.connect(self.toggle_turbo)
-
-        # Стиль для активного состояния
-        self.btn_turbo.setStyleSheet("""
-                    QPushButton { background-color: transparent; border: 1px solid #666; border-radius: 4px; color: #fff; font-size: 16px; }
-                    QPushButton:checked { background-color: #d4b765; border: 1px solid #d4b765; color: black; }
-                    QPushButton:hover { background-color: rgba(255,255,255,0.1); }
-                """)
-
-        # Добавляем и задаем размер
+        # Добавляем основные кнопки
         for btn in [self.btn_prev, self.btn_play, self.btn_next]:
             btn.setFixedSize(40, 40)
+            btn.setIconSize(QSize(20, 20))  # Размер иконки внутри кнопки
             btn.setCursor(Qt.PointingHandCursor)
             cont_layout.addWidget(btn)
 
-        cont_layout.addStretch()  # Пружина справа
+        cont_layout.addStretch()
+
+        # 5. TURBO
+        self.btn_turbo = QPushButton()
+        self.btn_turbo.setIcon(self.icon_turbo_white)
+        self.btn_turbo.setCheckable(True)
+        self.btn_turbo.setToolTip("Максимальная скорость")
+        self.btn_turbo.setFixedSize(40, 40)
+        self.btn_turbo.setIconSize(QSize(24, 24))
+        self.btn_turbo.setCursor(Qt.PointingHandCursor)
+        self.btn_turbo.toggled.connect(self.toggle_turbo)
+
+        # Стиль Turbo (меняем цвет фона и иконку при выборе)
+        self.btn_turbo.setStyleSheet("""
+            QPushButton { 
+                background-color: transparent; 
+                border: 1px solid #666; 
+                border-radius: 4px; 
+                padding: 8px;
+            }
+            QPushButton:hover { 
+                background-color: rgba(255,255,255,0.1); 
+            }
+            QPushButton:checked { 
+                background-color: #d4b765; 
+                border: 1px solid #d4b765; 
+            }
+        """)
+
         cont_layout.addWidget(self.btn_turbo)
+        cont_layout.setContentsMargins(0, 0, 20, 0)
         self.layout.addWidget(self.controls_container)
 
-        # --- ПОДКЛЮЧЕНИЕ ---
-        self.btn_prev.clicked.connect(self.step_backward)  # Новый слот
+        # Подключение
+        self.btn_prev.clicked.connect(self.step_backward)
         self.btn_play.clicked.connect(self.toggle_play_pause)
         self.btn_next.clicked.connect(self.step_forward)
+
+    @Slot(str)
+    def on_tracking_error(self, message):
+        self.btn_play.setIcon(self.icon_play)
+        self.error_occurred.emit(message)
+
+    def seek_to_frame(self, frame_index):
+        self.thread.seek(frame_index)
+        if self.thread.is_paused:
+            self.btn_play.setIcon(self.icon_play)
 
     @Slot(bool)
     def toggle_turbo(self, checked):
         self.thread.set_turbo_mode(checked)
+        if checked:
+            self.btn_turbo.setIcon(self.icon_turbo_black)
+        else:
+            self.btn_turbo.setIcon(self.icon_turbo_white)
 
     @Slot()
     def step_backward(self):
-        """Слот для кнопки назад"""
-        # Если видео играет, ставим на паузу
-        if not self.thread.is_paused:
-            self.pause_video()
-
-        # Делаем шаг
+        if not self.thread.is_paused: self.pause_video()
         self.thread.prev_frame()
 
     @Slot()
     def step_forward(self):
-        """Слот для кнопки вперед"""
-        # Если видео играет, ставим на паузу (стандартное поведение монтажных программ)
-        if not self.thread.is_paused:
-            self.pause_video()
-
+        if not self.thread.is_paused: self.pause_video()
         self.thread.next_frame()
 
     def _apply_styles(self):
@@ -379,26 +429,32 @@ class VideoPlayerWidget(QWidget):
                 background-color: #2d2d30;
                 border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
             }
+            /* Стили для обычных кнопок управления */
             QPushButton {
-                background-color: transparent; border: 1px solid #666;
-                border-radius: 4px; color: #fff; font-size: 16px;
+                background-color: transparent; 
+                border: 1px solid #666;
+                border-radius: 4px; 
             }
-            QPushButton:hover { background-color: rgba(255, 255, 255, 0.1); }
+            QPushButton:hover { 
+                background-color: rgba(255, 255, 255, 0.1); 
+                border-color: #888;
+            }
+            QPushButton:pressed {
+                background-color: rgba(255, 255, 255, 0.2); 
+            }
         """)
 
     @Slot(bool)
     def on_tracker_loading(self, is_loading):
-        """Блокирует интерфейс во время загрузки модели"""
         self.btn_play.setEnabled(not is_loading)
-
         if is_loading:
-            self.btn_play.setText("⏳")  # Или любой индикатор загрузки
-            # Если видео играло - ставим на паузу
+            # Можно поставить иконку часов, если есть
+            self.btn_play.setIcon(QIcon()) # Пустая или заглушка
             if not self.thread.is_paused:
                 self.pause_video()
         else:
-            # Возвращаем иконку (Play, так как мы ставим на паузу при загрузке)
-            self.btn_play.setText("▶")
+            # Возвращаем Play (так как мы на паузе)
+            self.btn_play.setIcon(self.icon_play)
 
     @Slot()
     def toggle_play_pause(self):
@@ -435,18 +491,21 @@ class VideoPlayerWidget(QWidget):
                         return
 
         self.thread.is_paused = not self.thread.is_paused
-        self.btn_play.setText("⏯" if not self.thread.is_paused else "▶")
+        if not self.thread.is_paused:
+            self.btn_play.setIcon(self.icon_pause)
+        else:
+            self.btn_play.setIcon(self.icon_play)
 
     @Slot()
     def pause_video(self):
         self.thread.is_paused = True
-        self.btn_play.setText("▶")
+        self.btn_play.setIcon(self.icon_play)
 
     @Slot()
     def stop_video(self):
         self.thread.is_paused = True
         self.thread.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-        self.btn_play.setText("▶")
+        self.btn_play.setIcon(self.icon_play)
         self.thread.next_frame()
 
     def cleanup(self):
@@ -454,5 +513,4 @@ class VideoPlayerWidget(QWidget):
             if hasattr(self, 'thread') and self.thread and self.thread.isRunning():
                 self.thread.stop()
                 self.thread.deleteLater()
-        except:
-            pass
+        except: pass

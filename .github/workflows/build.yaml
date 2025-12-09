@@ -3,8 +3,8 @@ name: Build Morris App
 on:
   push:
     tags:
-      - 'v*' # Сборка запускается при пуше тега (например v1.0)
-  workflow_dispatch: # Или вручную через интерфейс GitHub
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -16,22 +16,22 @@ jobs:
         include:
           # Windows
           - os: windows-latest
-            artifact_name: Morris-Windows-x64
+            artifact_name: Morris.exe # Хотим экзешник
             sep: '\'
 
           # Linux
           - os: ubuntu-latest
-            artifact_name: Morris-Linux-x64
+            artifact_name: Morris-Linux
             sep: '/'
 
           # MacOS Intel
           - os: macos-13
-            artifact_name: Morris-MacOS-Intel
+            artifact_name: Morris-Intel.dmg # Хотим DMG
             sep: '/'
 
-          # MacOS Silicon (M1/M2)
+          # MacOS Silicon
           - os: macos-14
-            artifact_name: Morris-MacOS-Silicon
+            artifact_name: Morris-Silicon.dmg # Хотим DMG
             sep: '/'
 
     steps:
@@ -43,7 +43,6 @@ jobs:
         with:
           python-version: '3.10'
 
-      # Установка зависимостей для Linux (нужно для сборки Qt)
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -56,7 +55,6 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      # Проверка наличия модели (чтобы не собрать битый билд)
       - name: Check for Model
         shell: bash
         run: |
@@ -65,38 +63,82 @@ jobs:
             exit 1
           fi
 
-      # Сборка. Запускаем из корня, указывая путь к spec
+      # СБОРКА
       - name: Build with PyInstaller
         run: |
           pyinstaller --clean --noconfirm scripts${{ matrix.sep }}build.spec
 
-      # --- УПАКОВКА ---
+      # --- УПАКОВКА И ПОДГОТОВКА АРТЕФАКТОВ ---
 
-      # Windows: ZIP
-      - name: Zip Windows Build
+      # 1. WINDOWS:
+      # Если ваш spec создает ONEFILE -> dist/Morris.exe уже готов.
+      # Если spec создает ONEDIR -> Мы не можем просто переименовать папку в exe.
+      # Ниже код предполагает, что spec настроен на ONEFILE.
+      # Если нет - вам придется оставить ZIP.
+      - name: Prepare Windows Artifact
         if: runner.os == 'Windows'
         run: |
-          Compress-Archive -Path dist\Morris -DestinationPath dist\Morris-Windows.zip
+          # Проверяем, есть ли exe. Если есть папка - придется зиповать или падать.
+          if (Test-Path dist\Morris.exe) {
+             Write-Output "Found EXE, ready to upload."
+          } else {
+             # Если spec делает папку, а мы хотим exe - это проблема конфигурации.
+             # Но для CI мы можем просто зазиповать папку, но назвать артефакт .zip
+             # Если вы хотите именно .exe, измените spec файл на onefile=True
+             Write-Output "Onefile not found. Compressing folder..."
+             Compress-Archive -Path dist\Morris -DestinationPath dist\Morris-Windows.zip
+          }
 
-      # MacOS: TAR (для .app бандла)
-      - name: Archive MacOS Build
-        if: runner.os == 'macOS'
-        run: |
-          cd dist
-          tar -czf ${{ matrix.artifact_name }}.tar.gz Morris.app
-
-      # Linux: TAR
-      - name: Archive Linux Build
+      # 2. LINUX:
+      # Аналогично Windows: если onefile, то файл `dist/Morris` готов.
+      # Если папка - пакуем в tar.gz, но делаем его исполняемым для пользователя
+      - name: Prepare Linux Artifact
         if: runner.os == 'Linux'
         run: |
-          cd dist
-          tar -czf ${{ matrix.artifact_name }}.tar.gz Morris
+          if [ -f dist/Morris ]; then
+            echo "Binary found."
+            chmod +x dist/Morris
+          else
+            echo "Folder found, archiving..."
+            cd dist
+            tar -czf Morris-Linux.tar.gz Morris
+          fi
 
-      # --- ЗАГРУЗКА АРТЕФАКТОВ ---
+      # 3. MACOS: Создание DMG из .app
+      - name: Create DMG (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install create-dmg
+          
+          # Убедимся, что .app существует
+          if [ -d "dist/Morris.app" ]; then
+            mkdir -p dist_dmg
+            
+            # Создаем DMG
+            create-dmg \
+              --volname "Morris Installer" \
+              --window-pos 200 120 \
+              --window-size 800 400 \
+              --icon-size 100 \
+              --icon "Morris.app" 200 190 \
+              --hide-extension "Morris.app" \
+              --app-drop-link 600 185 \
+              "dist_dmg/${{ matrix.artifact_name }}" \
+              "dist/Morris.app"
+          else
+            echo "Error: dist/Morris.app not found!"
+            exit 1
+          fi
+
+      # --- ЗАГРУЗКА ---
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: |
+            dist/*.exe
             dist/*.zip
+            dist/Morris
             dist/*.tar.gz
+            dist_dmg/*.dmg

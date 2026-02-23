@@ -58,7 +58,6 @@ excludes = [
     'ipdb',
     'debugpy',
     'twisted',
-    'pyyaml',
     'requests',
     'urllib3',
     'certifi',

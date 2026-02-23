@@ -26,8 +26,8 @@ from PySide6.QtWidgets import (
 from src.core import Video
 
 MAX_PENDING_REQUESTS = 30
-PREFETCH_LOOK_AHEAD = 10
-PREFETCH_LOOK_BEHIND = 5
+PREFETCH_LOOK_AHEAD = 30
+PREFETCH_LOOK_BEHIND = 15
 
 
 class FrameRequestThread(QThread):
@@ -177,8 +177,6 @@ class CachedFramesModel(QAbstractListModel):
                 indices_to_load.append(i)
 
         if indices_to_load:
-            keep_range = set(range(start_behind, end_ahead))
-            self.loader.clear_pending_except(keep_range)
             self.loader.request_frames_bulk(indices_to_load)
 
     def prefetch_from_scroll(self, center_index):
@@ -277,7 +275,7 @@ class FrameDelegate(QStyledItemDelegate):
 
 
 # --- 4. ВИДЖЕТ ТАЙМЛАЙНА ---
-DEBOUNCE_DELAY_MS = 50
+DEBOUNCE_DELAY_MS = 30
 
 
 class VideoTimelineWidget(QFrame):

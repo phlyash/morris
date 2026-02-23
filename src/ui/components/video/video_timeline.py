@@ -147,7 +147,7 @@ class CachedFramesModel(QAbstractListModel):
 
         self._tracking_data = {}
 
-        self.CACHE_SIZE_LIMIT = 150
+        self.CACHE_SIZE_LIMIT = 50
         self.center_index = 0
 
     def set_tracking_data_map(self, data_map):
@@ -275,7 +275,7 @@ class FrameDelegate(QStyledItemDelegate):
 
 
 # --- 4. ВИДЖЕТ ТАЙМЛАЙНА ---
-DEBOUNCE_DELAY_MS = 30
+DEBOUNCE_DELAY_MS = 100
 
 
 class VideoTimelineWidget(QFrame):

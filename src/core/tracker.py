@@ -25,18 +25,19 @@ class ONNXTracker:
         return blob
 
     def _postprocess(self, outputs, orig_shape):
-        outputs = np.array(outputs)
-        outputs = outputs.transpose(0, 2, 1)
+        output = np.array(outputs[0])
+        
+        if output.shape[0] == 1:
+            output = output[0]
         
         bboxes = []
         confs = []
         
-        for output in outputs[0]:
-            if len(output) < 5:
+        for detection in output.T:
+            if len(detection) < 5:
                 continue
             
-            cx, cy, w, h = output[:4]
-            obj_conf = output[4]
+            cx, cy, w, h, obj_conf = detection[:5]
             
             if obj_conf < self.conf_threshold:
                 continue

@@ -37,6 +37,7 @@ hiddenimports = [
     'PIL',
     'shutil',
     'onnxruntime',
+    'yaml'
 ]
 
 excludes = [
@@ -58,18 +59,11 @@ excludes = [
     'debugpy',
     'twisted',
     'pyyaml',
-    'yaml',
     'requests',
     'urllib3',
     'certifi',
     'charset-normalizer',
-    'idna',
-    'numpy.distutils',
-    'numpy.f2py',
-    'numpy.linalg',
-    'numpy.random',
-    'numpy.testing',
-    'numpy.distutils.command',
+    'idna'
 ]
 
 a = Analysis(

@@ -49,7 +49,6 @@ excludes = [
     'pandas',
     'seaborn',
     'plotly',
-    'Pillow',
     'ipython',
     'jupyter',
     'notebook',

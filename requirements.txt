@@ -2,3 +2,4 @@ PySide6-Essentials
 opencv-contrib-python
 numpy
 pyinstaller
+pyyaml

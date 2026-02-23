@@ -1,15 +1,26 @@
-import math
 import csv
-import cv2
+import math
 from pathlib import Path
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                               QTableWidget, QTableWidgetItem, QHeaderView,
-                               QPushButton, QFileDialog, QProgressBar, QFrame)
-from PySide6.QtGui import QColor, QCursor
-from PySide6.QtCore import Qt, QThread, Signal
 
-from src.core.project import Project
+import cv2
+from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QColor, QCursor
+from PySide6.QtWidgets import (
+    QFileDialog,
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QProgressBar,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
 from src.core.mor_parser.morris_file import MorrisFile
+from src.core.project import Project
 
 
 class StatisticsLoader(QThread):
@@ -37,38 +48,35 @@ class StatisticsLoader(QThread):
                 "is_marked": False,
                 "total_time": 0.0,
                 "total_dist": 0.0,
-                "zones": {}
+                "zones": {},
             }
 
             mor_path = morris_dir / f"{video.path.stem}.mor"
 
             if mor_path.exists():
                 try:
-                    # 1. FPS
                     cap = cv2.VideoCapture(str(video.path))
                     fps = cap.get(cv2.CAP_PROP_FPS)
-                    if not fps or math.isnan(fps): fps = 30.0
+                    if not fps or math.isnan(fps):
+                        fps = 30.0
                     cap.release()
 
-                    # 2. Загрузка
                     mor = MorrisFile(str(mor_path))
                     mor.load()
 
-                    # 3. ПОДГОТОВКА ДАННЫХ ДЛЯ РАСЧЕТА
-                    # Собираем все активные зоны из файла
                     active_zones = []
                     for stat in mor.stats_blocks:
-                        # stat.geometry - это математический объект (Square, Circle...), у него есть метод contains
-                        if getattr(stat, 'is_active', True):
+                        if getattr(stat, "is_active", True):
                             all_zone_names.add(stat.name)
-                            active_zones.append({
-                                "name": stat.name,
-                                "geom": stat.geometry,
-                                "time": 0.0,
-                                "dist": 0.0
-                            })
+                            active_zones.append(
+                                {
+                                    "name": stat.name,
+                                    "geom": stat.geometry,
+                                    "time": 0.0,
+                                    "dist": 0.0,
+                                }
+                            )
 
-                    # 4. ПРОХОД ПО ТРЕКИНГУ И РАСЧЕТ НА ЛЕТУ
                     total_dist = 0.0
                     total_frames = 0
                     prev_center = None
@@ -77,16 +85,16 @@ class StatisticsLoader(QThread):
                     for block in mor.sequence.blocks:
                         total_frames += len(block.rects)
                         for rect in block.rects:
-                            # rect = (x, y, w, h)
                             cx = rect[0] + rect[2] / 2
                             cy = rect[1] + rect[3] / 2
 
                             step_dist = 0.0
                             if prev_center:
-                                step_dist = math.hypot(cx - prev_center[0], cy - prev_center[1])
+                                step_dist = math.hypot(
+                                    cx - prev_center[0], cy - prev_center[1]
+                                )
                                 total_dist += step_dist
 
-                            # --- ПРОВЕРКА ЗОН ---
                             for zone in active_zones:
                                 if zone["geom"].contains(cx, cy):
                                     zone["time"] += frame_time
@@ -94,18 +102,30 @@ class StatisticsLoader(QThread):
 
                             prev_center = (cx, cy)
 
-                        # Разрыв блока
                         prev_center = None
 
-                    # 5. ЗАПИСЬ РЕЗУЛЬТАТОВ
                     row_data["is_marked"] = mor.get_marked_status()
                     row_data["total_time"] = total_frames / fps
                     row_data["total_dist"] = total_dist
 
                     for zone in active_zones:
+                        zone_time = zone["time"]
+                        zone_dist = zone["dist"]
+                        pct_time = (
+                            (zone_time / row_data["total_time"] * 100)
+                            if row_data["total_time"] > 0
+                            else 0
+                        )
+                        pct_dist = (
+                            (zone_dist / row_data["total_dist"] * 100)
+                            if row_data["total_dist"] > 0
+                            else 0
+                        )
                         row_data["zones"][zone["name"]] = {
-                            "time": zone["time"],
-                            "dist": zone["dist"]
+                            "time": zone_time,
+                            "dist": zone_dist,
+                            "pct_time": pct_time,
+                            "pct_dist": pct_dist,
                         }
 
                 except Exception as e:
@@ -141,8 +161,8 @@ class ProjectStatisticsWidget(QWidget):
         header.addStretch()
 
         btn_style = """
-            QPushButton { 
-                background-color: #3B3C40; color: white; padding: 8px 15px; 
+            QPushButton {
+                background-color: #3B3C40; color: white; padding: 8px 15px;
                 border: 1px solid #555; border-radius: 4px; font-size: 13px;
             }
             QPushButton:hover { background-color: #45464a; }
@@ -171,27 +191,29 @@ class ProjectStatisticsWidget(QWidget):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setAlternatingRowColors(True)
-        self.table.setFocusPolicy(Qt.NoFocus)  # Убираем фокус с таблицы, чтобы не было рамок
+        self.table.setFocusPolicy(
+            Qt.NoFocus
+        )  # Убираем фокус с таблицы, чтобы не было рамок
 
         # ИСПРАВЛЕННЫЙ СТИЛЬ:
         # 1. outline: 0 - убирает пунктирную рамку фокуса
         # 2. selection-background-color - задает нормальный цвет выделения вместо желтого
         self.table.setStyleSheet("""
-            QTableWidget { 
-                background-color: #252526; 
-                border: 1px solid #3e3e42; 
+            QTableWidget {
+                background-color: #252526;
+                border: 1px solid #3e3e42;
                 color: #ccc;
                 gridline-color: #3e3e42;
                 alternate-background-color: #2a2a2e;
-                outline: 0; 
+                outline: 0;
                 selection-background-color: #444448;
                 selection-color: white;
             }
-            QHeaderView::section { 
-                background-color: #333; 
-                color: white; 
-                padding: 6px; 
-                border: none; 
+            QHeaderView::section {
+                background-color: #333;
+                color: white;
+                padding: 6px;
+                border: none;
                 font-weight: bold;
                 border-right: 1px solid #3e3e42;
             }
@@ -211,8 +233,8 @@ class ProjectStatisticsWidget(QWidget):
         # Сменил цвет чанка на зеленый (#00FF00) или нейтральный, чтобы не раздражал.
         # Если хотите желтый, верните #d4b765.
         self.progress_bar.setStyleSheet("""
-            QProgressBar { background: #333; border: none; } 
-            QProgressBar::chunk { background: #d4b765; } 
+            QProgressBar { background: #333; border: none; }
+            QProgressBar::chunk { background: #d4b765; }
         """)
         self.progress_bar.setVisible(False)
         layout.addWidget(self.progress_bar)
@@ -258,34 +280,30 @@ class ProjectStatisticsWidget(QWidget):
         self.rows_data = rows
         self.zone_columns = unique_zones
 
-        # 1. Заголовки
         headers = ["Видео", "Размечено", "Время (общ)", "Дист. (общ)"]
         for zone_name in unique_zones:
             headers.append(f"Время ({zone_name})")
             headers.append(f"Дист. ({zone_name})")
+            headers.append(f"Время % ({zone_name})")
+            headers.append(f"Дист. % ({zone_name})")
 
-        # Устанавливаем колонки один раз
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)
 
-        # 2. Заполнение
         self.table.setRowCount(len(rows))
 
         for i, row in enumerate(rows):
             col = 0
 
-            # Видео
-            name_item = QTableWidgetItem(row['name'])
-            # Стилизуем как ссылку (синий, подчеркнутый, курсор-рука)
+            name_item = QTableWidgetItem(row["name"])
             name_item.setForeground(QColor("#4a90e2"))
-            name_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable) # Разрешаем выделение
+            name_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             self.table.setItem(i, col, name_item)
             col += 1
 
-            # Статус
-            status_txt = "Да" if row['is_marked'] else "Нет"
+            status_txt = "Да" if row["is_marked"] else "Нет"
             item_status = QTableWidgetItem(status_txt)
-            if row['is_marked']:
+            if row["is_marked"]:
                 item_status.setForeground(QColor("#00FF00"))
             else:
                 item_status.setForeground(QColor("#666"))
@@ -293,24 +311,29 @@ class ProjectStatisticsWidget(QWidget):
             self.table.setItem(i, col, item_status)
             col += 1
 
-            # Общие
-            self.table.setItem(i, col, QTableWidgetItem(f"{row['total_time']:.2f}"));
+            self.table.setItem(i, col, QTableWidgetItem(f"{row['total_time']:.2f}"))
             col += 1
-            self.table.setItem(i, col, QTableWidgetItem(f"{row['total_dist']:.0f}"));
+            self.table.setItem(i, col, QTableWidgetItem(f"{row['total_dist']:.0f}"))
             col += 1
 
-            # Зоны
             for zone_name in unique_zones:
-                if zone_name in row['zones']:
-                    z_data = row['zones'][zone_name]
+                if zone_name in row["zones"]:
+                    z_data = row["zones"][zone_name]
                     t_val = f"{z_data['time']:.2f}"
                     d_val = f"{z_data['dist']:.0f}"
+                    pct_t_val = f"{z_data.get('pct_time', 0):.1f}"
+                    pct_d_val = f"{z_data.get('pct_dist', 0):.1f}"
                 else:
                     t_val, d_val = "-", "-"
+                    pct_t_val, pct_d_val = "-", "-"
 
-                self.table.setItem(i, col, QTableWidgetItem(t_val));
+                self.table.setItem(i, col, QTableWidgetItem(t_val))
                 col += 1
-                self.table.setItem(i, col, QTableWidgetItem(d_val));
+                self.table.setItem(i, col, QTableWidgetItem(d_val))
+                col += 1
+                self.table.setItem(i, col, QTableWidgetItem(pct_t_val))
+                col += 1
+                self.table.setItem(i, col, QTableWidgetItem(pct_d_val))
                 col += 1
 
         # Ресайз
@@ -325,33 +348,46 @@ class ProjectStatisticsWidget(QWidget):
         self.btn_export.setEnabled(True)
 
     def export_csv(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Экспорт статистики", "", "CSV Files (*.csv)")
-        if not path: return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Экспорт статистики", "", "CSV Files (*.csv)"
+        )
+        if not path:
+            return
 
         try:
-            with open(path, 'w', newline='', encoding='utf-8-sig') as f:
-                writer = csv.writer(f, delimiter=';')
+            with open(path, "w", newline="", encoding="utf-8-sig") as f:
+                writer = csv.writer(f, delimiter=";")
 
                 headers = ["Video", "Is Marked", "Total Time", "Total Distance"]
                 for zone in self.zone_columns:
                     headers.append(f"Time [{zone}]")
                     headers.append(f"Dist [{zone}]")
+                    headers.append(f"Time % [{zone}]")
+                    headers.append(f"Dist % [{zone}]")
                 writer.writerow(headers)
 
                 for row in self.rows_data:
                     csv_row = [
-                        row['name'],
-                        "Yes" if row['is_marked'] else "No",
-                        f"{row['total_time']:.3f}".replace('.', ','),
-                        f"{row['total_dist']:.3f}".replace('.', ',')
+                        row["name"],
+                        "Yes" if row["is_marked"] else "No",
+                        f"{row['total_time']:.3f}".replace(".", ","),
+                        f"{row['total_dist']:.3f}".replace(".", ","),
                     ]
 
                     for zone_name in self.zone_columns:
-                        if zone_name in row['zones']:
-                            z_data = row['zones'][zone_name]
-                            csv_row.append(f"{z_data['time']:.3f}".replace('.', ','))
-                            csv_row.append(f"{z_data['dist']:.3f}".replace('.', ','))
+                        if zone_name in row["zones"]:
+                            z_data = row["zones"][zone_name]
+                            csv_row.append(f"{z_data['time']:.3f}".replace(".", ","))
+                            csv_row.append(f"{z_data['dist']:.3f}".replace(".", ","))
+                            csv_row.append(
+                                f"{z_data.get('pct_time', 0):.1f}".replace(".", ",")
+                            )
+                            csv_row.append(
+                                f"{z_data.get('pct_dist', 0):.1f}".replace(".", ",")
+                            )
                         else:
+                            csv_row.append("0")
+                            csv_row.append("0")
                             csv_row.append("0")
                             csv_row.append("0")
 

@@ -1,12 +1,30 @@
 import sys
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-                               QLabel, QStackedWidget, QFrame, QComboBox,
-                               QLineEdit, QButtonGroup, QApplication, QDoubleSpinBox,
-                               QListWidget, QListWidgetItem, QAbstractItemView, QColorDialog, QCheckBox, QTableWidget,
-                               QHeaderView, QTableWidgetItem)
-from PySide6.QtCore import Qt, Signal, QSize, QEvent
-from PySide6.QtGui import QIcon, QPainter, QColor, QPixmap
+
+from PySide6.QtCore import QEvent, QSize, Qt, Signal
+from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
+    QButtonGroup,
+    QCheckBox,
+    QColorDialog,
+    QComboBox,
+    QDoubleSpinBox,
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QStackedWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 # Пытаемся импортировать конфиг, если нет - заглушка
 try:
@@ -33,6 +51,7 @@ FIXED_ALPHA = 30
 
 # --- ГРАФИЧЕСКИЕ УТИЛИТЫ ---
 
+
 def svg_to_pixmap(svg_path: str, width: int, height: int) -> QPixmap:
     """
     Рендерит SVG.
@@ -57,7 +76,8 @@ def svg_to_pixmap(svg_path: str, width: int, height: int) -> QPixmap:
 
 
 def recolor_pixmap(pixmap: QPixmap, color_hex: str) -> QPixmap:
-    if pixmap.isNull(): return pixmap
+    if pixmap.isNull():
+        return pixmap
     target = QPixmap(pixmap.size())
     target.fill(Qt.transparent)
     painter = QPainter(target)
@@ -70,6 +90,7 @@ def recolor_pixmap(pixmap: QPixmap, color_hex: str) -> QPixmap:
 
 
 # --- ВИДЖЕТ СТРОКИ СПИСКА ---
+
 
 class GeometryListRow(QWidget):
     # Сигнал удаления
@@ -95,7 +116,9 @@ class GeometryListRow(QWidget):
 
         # 2. Имя
         self.name_label = QLabel(name)
-        self.name_label.setStyleSheet(f"color: {TEXT_WHITE}; font-size: 13px; border: none;")
+        self.name_label.setStyleSheet(
+            f"color: {TEXT_WHITE}; font-size: 13px; border: none;"
+        )
         self.name_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
 
         # 3. Checkbox "Статистика"
@@ -136,7 +159,9 @@ class GeometryListRow(QWidget):
         self.name_label.setText(name)
         base = svg_to_pixmap(self.svg_path, 128, 128)
         colored = recolor_pixmap(base, color_hex)
-        self.icon_label.setPixmap(colored.scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        self.icon_label.setPixmap(
+            colored.scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        )
 
         # Блокируем сигналы, чтобы не вызвать зацикливание при программном обновлении
         self.chk_stat.blockSignals(True)
@@ -202,18 +227,18 @@ class BasePage(QWidget):
 
             /* СТИЛЬ СПИСКА */
             QListWidget {{
-                background-color: {LIST_BG}; 
-                border: 1px solid #444; 
-                border-radius: 6px; 
+                background-color: {LIST_BG};
+                border: 1px solid #444;
+                border-radius: 6px;
                 outline: 0; /* Убирает пунктирную обводку фокуса */
             }}
-            QListWidget::item {{ 
-                border-bottom: 1px solid #3a3a3a; 
+            QListWidget::item {{
+                border-bottom: 1px solid #3a3a3a;
                 margin: 0px;
             }}
             /* ВЫДЕЛЕННАЯ СТРОКА: Задает фон для всего элемента списка */
-            QListWidget::item:selected {{ 
-                background-color: #444448; 
+            QListWidget::item:selected {{
+                background-color: #444448;
                 border: 1px solid {ACCENT_YELLOW}; /* Желтая рамка активного элемента */
                 border-radius: 4px;
             }}
@@ -237,13 +262,15 @@ class GeometryPage(BasePage):
             "donut": str(get_resource_path("donut.svg")),
             "circle": str(get_resource_path("circle.svg")),
             "square": str(get_resource_path("square.svg")),
-            "poly": str(get_resource_path("poly.svg"))
+            "poly": str(get_resource_path("poly.svg")),
         }
 
         layout = QVBoxLayout(self)
 
         # 1. Формы
-        layout.addWidget(QLabel("Задать форму геометрии", styleSheet="font-weight: bold;"))
+        layout.addWidget(
+            QLabel("Задать форму геометрии", styleSheet="font-weight: bold;")
+        )
         shapes_layout = QHBoxLayout()
         self.shape_group = QButtonGroup(self)
         self.shape_group.setExclusive(True)
@@ -256,14 +283,18 @@ class GeometryPage(BasePage):
         layout.addLayout(shapes_layout)
 
         # 2. Имя
-        layout.addWidget(QLabel("Имя объекта", styleSheet="font-weight: bold; margin-top: 10px;"))
+        layout.addWidget(
+            QLabel("Имя объекта", styleSheet="font-weight: bold; margin-top: 10px;")
+        )
         self.inp_name = QLineEdit()
         self.inp_name.setPlaceholderText("Название зоны")
         self.inp_name.textChanged.connect(self._on_ui_changed)
         layout.addWidget(self.inp_name)
 
         # 3. Цвет
-        layout.addWidget(QLabel("Цвет", styleSheet="font-weight: bold; margin-top: 10px;"))
+        layout.addWidget(
+            QLabel("Цвет", styleSheet="font-weight: bold; margin-top: 10px;")
+        )
         color_layout = QHBoxLayout()
         self.btn_color_preview = QPushButton()
         self.btn_color_preview.setFixedSize(40, 35)
@@ -275,7 +306,9 @@ class GeometryPage(BasePage):
         layout.addLayout(color_layout)
 
         # 4. СПИСОК ОБЪЕКТОВ
-        layout.addWidget(QLabel("Список объектов", styleSheet="font-weight: bold; margin-top: 10px;"))
+        layout.addWidget(
+            QLabel("Список объектов", styleSheet="font-weight: bold; margin-top: 10px;")
+        )
         self.list_widget = QListWidget()
         self.list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.list_widget.itemSelectionChanged.connect(self._on_list_selection_changed)
@@ -283,15 +316,26 @@ class GeometryPage(BasePage):
         layout.addWidget(self.list_widget)
 
         # 5. Координаты
-        layout.addWidget(QLabel("Координаты", styleSheet="color: #777; font-size: 11px; margin-top: 10px;"))
+        layout.addWidget(
+            QLabel(
+                "Координаты",
+                styleSheet="color: #777; font-size: 11px; margin-top: 10px;",
+            )
+        )
         pos_layout = QHBoxLayout()
-        self.inp_x = QDoubleSpinBox(); self.inp_x.setRange(-9999, 9999)
-        self.inp_y = QDoubleSpinBox(); self.inp_y.setRange(-9999, 9999)
-        self.inp_w = QDoubleSpinBox(); self.inp_w.setRange(0, 9999)
-        self.inp_h = QDoubleSpinBox(); self.inp_h.setRange(0, 9999)
+        self.inp_x = QDoubleSpinBox()
+        self.inp_x.setRange(-9999, 9999)
+        self.inp_y = QDoubleSpinBox()
+        self.inp_y.setRange(-9999, 9999)
+        self.inp_w = QDoubleSpinBox()
+        self.inp_w.setRange(0, 9999)
+        self.inp_h = QDoubleSpinBox()
+        self.inp_h.setRange(0, 9999)
         for w in [self.inp_x, self.inp_y, self.inp_w, self.inp_h]:
             w.valueChanged.connect(self._on_ui_changed)
-            w.setStyleSheet(f"background-color: {INPUT_BG}; color: #ccc; border: 1px solid #444; border-radius: 4px;")
+            w.setStyleSheet(
+                f"background-color: {INPUT_BG}; color: #ccc; border: 1px solid #444; border-radius: 4px;"
+            )
             pos_layout.addWidget(w)
         layout.addLayout(pos_layout)
 
@@ -306,26 +350,32 @@ class GeometryPage(BasePage):
                     self.delete_selected_items()
                     return True
         return super().eventFilter(source, event)
+
     # --- ЛОГИКА ---
     def _on_shape_tool_clicked(self, btn):
         self.shape_create_requested.emit(btn.property("shape_type"))
 
     def _open_color_dialog(self):
         init_c = self.inp_hex.text()
-        if not init_c.startswith("#"): init_c = "#" + init_c
+        if not init_c.startswith("#"):
+            init_c = "#" + init_c
         color = QColorDialog.getColor(QColor(init_c), self, "Выберите цвет")
-        if color.isValid(): self.inp_hex.setText(color.name().upper().replace("#", ""))
+        if color.isValid():
+            self.inp_hex.setText(color.name().upper().replace("#", ""))
 
     def _update_color_preview(self, hex_code):
-        if not hex_code.startswith("#"): hex_code = "#" + hex_code
+        if not hex_code.startswith("#"):
+            hex_code = "#" + hex_code
         self.btn_color_preview.setStyleSheet(
-            f"background-color: {hex_code}; border: 1px solid #666; border-radius: 4px;")
+            f"background-color: {hex_code}; border: 1px solid #666; border-radius: 4px;"
+        )
 
     # --- УДАЛЕНИЕ ---
 
     def delete_selected_items(self):
         """Удаляет все объекты, выбранные сейчас в списке"""
-        if not self.selected_items: return
+        if not self.selected_items:
+            return
 
         items_to_delete = list(self.selected_items)  # Копия списка
         self.items_deleted.emit(items_to_delete)  # Сообщаем View удалить их со сцены
@@ -355,9 +405,9 @@ class GeometryPage(BasePage):
     def _clear_ui_fields(self):
         self._block_signals = True
         self.inp_name.clear()
-        self.inp_x.setValue(0);
+        self.inp_x.setValue(0)
         self.inp_y.setValue(0)
-        self.inp_w.setValue(0);
+        self.inp_w.setValue(0)
         self.inp_h.setValue(0)
         self._block_signals = False
 
@@ -365,14 +415,15 @@ class GeometryPage(BasePage):
 
     def register_new_item(self, item):
         current_hex = self.inp_hex.text()
-        if len(current_hex) != 6: current_hex = "FFDD78"
+        if len(current_hex) != 6:
+            current_hex = "FFDD78"
         name = self.inp_name.text().strip()
 
         item.set_color_data(f"#{current_hex}", self.fixed_alpha)
         item.name = name
 
         # Инициализируем флаг статистики, если его нет
-        if not hasattr(item, 'is_stat_zone'):
+        if not hasattr(item, "is_stat_zone"):
             item.is_stat_zone = True  # По умолчанию включено
 
         self._add_to_list(item)
@@ -385,14 +436,20 @@ class GeometryPage(BasePage):
 
         c = item.base_color.name().upper()
         # Создаем виджет строки, передавая состояние is_stat_zone
-        row_widget = GeometryListRow(item.name, c, self.shape_paths.get(item.shape_type, ""),
-                                     getattr(item, 'is_stat_zone', True))
+        row_widget = GeometryListRow(
+            item.name,
+            c,
+            self.shape_paths.get(item.shape_type, ""),
+            getattr(item, "is_stat_zone", True),
+        )
 
         # Подключаем сигналы
         row_widget.delete_requested.connect(lambda i=item: self.delete_specific_item(i))
 
         # Обновляем item при клике на чекбокс
-        row_widget.stat_toggled.connect(lambda state, i=item: self._on_item_stat_changed(i, state))
+        row_widget.stat_toggled.connect(
+            lambda state, i=item: self._on_item_stat_changed(i, state)
+        )
 
         self.list_widget.insertItem(0, list_item)
         self.list_widget.setItemWidget(list_item, row_widget)
@@ -404,23 +461,26 @@ class GeometryPage(BasePage):
         # Здесь можно добавить логику, если нужно обновить UI при изменении флага
 
     def _on_list_selection_changed(self):
-        if self._block_signals: return
+        if self._block_signals:
+            return
         list_items = self.list_widget.selectedItems()
         items = [li.data(Qt.UserRole) for li in list_items]
         self.selected_items = items
         self.selection_changed_requested.emit(items)
-        if items: self._load_data_to_ui(items[-1])
+        if items:
+            self._load_data_to_ui(items[-1])
 
     def load_item_data(self, item):
-        if not item: return
+        if not item:
+            return
         self._block_signals = True
         self.current_item = item
 
-        r = item.rect;
+        r = item.rect
         pos = item.pos()
-        self.inp_x.setValue(pos.x());
+        self.inp_x.setValue(pos.x())
         self.inp_y.setValue(pos.y())
-        self.inp_w.setValue(r.width());
+        self.inp_w.setValue(r.width())
         self.inp_h.setValue(r.height())
 
         c = item.base_color
@@ -428,7 +488,7 @@ class GeometryPage(BasePage):
         self.inp_hex.setText(hex_c)
         self._update_color_preview(hex_c)
 
-        if hasattr(item, 'name'):
+        if hasattr(item, "name"):
             self.inp_name.setText(item.name)
 
         # Выделяем в списке
@@ -450,7 +510,8 @@ class GeometryPage(BasePage):
             item_data = li.data(Qt.UserRole)
             if item_data in items:
                 li.setSelected(True)
-                if item_data == items[-1]: self.list_widget.scrollToItem(li)
+                if item_data == items[-1]:
+                    self.list_widget.scrollToItem(li)
 
         self.list_widget.blockSignals(False)
         if items:
@@ -461,7 +522,8 @@ class GeometryPage(BasePage):
 
     def reset_tool_selection(self):
         self.shape_group.setExclusive(False)
-        for btn in self.shape_group.buttons(): btn.setChecked(False)
+        for btn in self.shape_group.buttons():
+            btn.setChecked(False)
         self.shape_group.setExclusive(True)
 
     def _load_data_to_ui(self, item):
@@ -481,40 +543,43 @@ class GeometryPage(BasePage):
         if count > 1:
             self.inp_name.setText("group")
             self.inp_name.setEnabled(False)
-            self.inp_x.clear();
+            self.inp_x.clear()
             self.inp_y.clear()
-            self.inp_w.clear();
+            self.inp_w.clear()
             self.inp_h.clear()
-            self.inp_x.setEnabled(False);
+            self.inp_x.setEnabled(False)
             self.inp_y.setEnabled(False)
-            self.inp_w.setEnabled(False);
+            self.inp_w.setEnabled(False)
             self.inp_h.setEnabled(False)
         else:
             self._set_inputs_enabled(True)
-            r = item.rect;
+            r = item.rect
             pos = item.pos()
-            self.inp_x.setValue(pos.x());
+            self.inp_x.setValue(pos.x())
             self.inp_y.setValue(pos.y())
-            self.inp_w.setValue(r.width());
+            self.inp_w.setValue(r.width())
             self.inp_h.setValue(r.height())
-            if hasattr(item, 'name'): self.inp_name.setText(item.name)
+            if hasattr(item, "name"):
+                self.inp_name.setText(item.name)
         self._block_signals = False
 
     def _set_inputs_enabled(self, enabled: bool):
         self.inp_name.setEnabled(enabled)
-        self.inp_x.setEnabled(enabled);
+        self.inp_x.setEnabled(enabled)
         self.inp_y.setEnabled(enabled)
-        self.inp_w.setEnabled(enabled);
+        self.inp_w.setEnabled(enabled)
         self.inp_h.setEnabled(enabled)
 
     def _on_ui_changed(self):
-        if self._block_signals or not self.selected_items: return
-        x = self.inp_x.value();
+        if self._block_signals or not self.selected_items:
+            return
+        x = self.inp_x.value()
         y = self.inp_y.value()
-        w = self.inp_w.value();
+        w = self.inp_w.value()
         h = self.inp_h.value()
         hex_c = self.inp_hex.text()
-        if len(hex_c) != 6: hex_c = "FFDD78"
+        if len(hex_c) != 6:
+            hex_c = "FFDD78"
         self._update_color_preview(hex_c)
 
         for item in self.selected_items:
@@ -530,15 +595,20 @@ class GeometryPage(BasePage):
             if it in self.selected_items:
                 widget = self.list_widget.itemWidget(li)
                 if widget:
-                    display_name = item.name if len(self.selected_items) == 1 else it.name
+                    display_name = (
+                        item.name if len(self.selected_items) == 1 else it.name
+                    )
                     # Обновляем визуал, передавая текущее состояние is_stat_zone
-                    widget.update_visuals(display_name, f"#{hex_c}", getattr(it, 'is_stat_zone', True))
+                    widget.update_visuals(
+                        display_name, f"#{hex_c}", getattr(it, "is_stat_zone", True)
+                    )
 
     def get_all_items(self) -> list:
         items = []
         for i in range(self.list_widget.count()):
             item = self.list_widget.item(i).data(Qt.UserRole)
-            if item: items.append(item)
+            if item:
+                items.append(item)
         return items
 
     def add_existing_item(self, item):
@@ -547,7 +617,7 @@ class GeometryPage(BasePage):
 
 class TrackerPage(BasePage):
     # Сигналы для контроллера
-    model_changed = Signal(str)      # "CSRT" / "YOLO"
+    model_changed = Signal(str)  # "CSRT" / "YOLO"
     manual_setup_toggled = Signal(bool)
 
     def __init__(self):
@@ -568,12 +638,16 @@ class TrackerPage(BasePage):
 
         self.lbl_error = QLabel()
         self.lbl_error.setWordWrap(True)
-        self.lbl_error.setStyleSheet("color: #ff5555; font-size: 12px; font-weight: bold;")
-        self.lbl_error.setVisible(False) # Скрыто по умолчанию
+        self.lbl_error.setStyleSheet(
+            "color: #ff5555; font-size: 12px; font-weight: bold;"
+        )
+        self.lbl_error.setVisible(False)  # Скрыто по умолчанию
         layout.addWidget(self.lbl_error)
 
         # Описание
-        info = QLabel("• CSRT: Точный, требует ручной инициализации.\n• YOLO: Автоматический поиск, поддерживает дообучение.")
+        info = QLabel(
+            "• CSRT: Точный, требует ручной инициализации.\n• YOLO: Автоматический поиск, поддерживает дообучение."
+        )
         info.setWordWrap(True)
         info.setStyleSheet("color: #aaa; font-size: 12px;")
         layout.addWidget(info)
@@ -590,16 +664,16 @@ class TrackerPage(BasePage):
 
         # Стили: добавляем состояние :checked (Желтый фон, черный текст)
         self.btn_manual.setStyleSheet("""
-                    QPushButton { 
-                        background-color: #3B3C40; color: white; padding: 10px; 
+                    QPushButton {
+                        background-color: #3B3C40; color: white; padding: 10px;
                         border: 1px solid #555; border-radius: 4px; text-align: left;
                     }
                     QPushButton:hover { background-color: #45464a; }
 
                     /* Стиль для нажатого состояния */
-                    QPushButton:checked { 
+                    QPushButton:checked {
                         background-color: #d4b765; /* Желтый акцент */
-                        color: #1e1e1e; 
+                        color: #1e1e1e;
                         border: 1px solid #d4b765;
                     }
                 """)
@@ -631,7 +705,7 @@ class StatisticsPage(BasePage):
             "donut": str(get_resource_path("donut.svg")),
             "circle": str(get_resource_path("circle.svg")),
             "square": str(get_resource_path("square.svg")),
-            "poly": str(get_resource_path("poly.svg"))
+            "poly": str(get_resource_path("poly.svg")),
         }
 
         # 1. Заголовок
@@ -653,27 +727,29 @@ class StatisticsPage(BasePage):
         layout.addWidget(lbl_zones)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(["Зона", "Время", "Дист."])
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(
+            ["Зона", "Время", "Дист.", "Время %", "Дист. %"]
+        )
 
         # Стиль: убираем сетку, делаем прозрачный фон, чтобы выглядело как список
         self.table.setStyleSheet("""
-            QTableWidget { 
-                background-color: #2d2d30; 
-                border: 1px solid #444; 
+            QTableWidget {
+                background-color: #2d2d30;
+                border: 1px solid #444;
                 gridline-color: #3a3a3a;
                 font-family: 'Segoe UI'; font-size: 13px;
             }
-            QHeaderView::section { 
-                background-color: #333; 
-                color: #aaa; 
-                padding: 4px; 
-                border: none; 
+            QHeaderView::section {
+                background-color: #333;
+                color: #aaa;
+                padding: 4px;
+                border: none;
                 font-weight: bold;
             }
-            QTableWidget::item { 
-                padding: 5px; 
-                color: white; 
+            QTableWidget::item {
+                padding: 5px;
+                color: white;
             }
         """)
 
@@ -681,6 +757,8 @@ class StatisticsPage(BasePage):
         header.setSectionResizeMode(0, QHeaderView.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
 
         self.table.verticalHeader().setVisible(False)
         # Убираем возможность выделять ячейки
@@ -698,16 +776,13 @@ class StatisticsPage(BasePage):
 
         self.table.setRowCount(len(zones_stats))
 
-        # Сортируем по имени для стабильности отображения
         sorted_zones = sorted(zones_stats.items(), key=lambda x: x[0])
 
         for row, (name, data) in enumerate(sorted_zones):
-            # 1. КОЛОНКА ИМЕНИ С ИКОНКОЙ
             item_name = QTableWidgetItem(name)
 
-            # Генерируем иконку
-            shape_type = data.get('shape', 'square')
-            color_hex = data.get('color', '#ffffff')
+            shape_type = data.get("shape", "square")
+            color_hex = data.get("color", "#ffffff")
             path = self.shape_paths.get(shape_type, "")
 
             if path:
@@ -719,20 +794,32 @@ class StatisticsPage(BasePage):
             item_name.setFlags(Qt.ItemIsEnabled)
             self.table.setItem(row, 0, item_name)
 
-            # 2. ВРЕМЯ
             item_time = QTableWidgetItem(f"{data['time']:.2f} с")
             item_time.setTextAlignment(Qt.AlignCenter)
             item_time.setFlags(Qt.ItemIsEnabled)
             self.table.setItem(row, 1, item_time)
 
-            # 3. ДИСТАНЦИЯ
             item_dist = QTableWidgetItem(f"{data['dist']:.0f}")
             item_dist.setTextAlignment(Qt.AlignCenter)
             item_dist.setFlags(Qt.ItemIsEnabled)
             self.table.setItem(row, 2, item_dist)
 
+            pct_time = (data["time"] / t * 100) if t > 0 else 0
+            pct_dist = (data["dist"] / d * 100) if d > 0 else 0
+
+            item_pct_time = QTableWidgetItem(f"{pct_time:.1f}")
+            item_pct_time.setTextAlignment(Qt.AlignCenter)
+            item_pct_time.setFlags(Qt.ItemIsEnabled)
+            self.table.setItem(row, 3, item_pct_time)
+
+            item_pct_dist = QTableWidgetItem(f"{pct_dist:.1f}")
+            item_pct_dist.setTextAlignment(Qt.AlignCenter)
+            item_pct_dist.setFlags(Qt.ItemIsEnabled)
+            self.table.setItem(row, 4, item_pct_dist)
+
 
 # ... (импорты те же)
+
 
 class SidebarTabsWidget(QFrame):
     tab_changed = Signal(int)
@@ -748,7 +835,8 @@ class SidebarTabsWidget(QFrame):
         self.header = QFrame()
         self.header.setFixedHeight(44)
         self.header.setStyleSheet(
-            f"background:{HEADER_BG}; border-radius:12px; border-bottom-left-radius:0; border-bottom-right-radius:0;")
+            f"background:{HEADER_BG}; border-radius:12px; border-bottom-left-radius:0; border-bottom-right-radius:0;"
+        )
 
         self.header_layout = QHBoxLayout(self.header)  # Сохраняем layout в self
         self.header_layout.setContentsMargins(10, 0, 10, 0)
@@ -787,7 +875,8 @@ class SidebarTabsWidget(QFrame):
 
         self.cont = QFrame()
         self.cont.setStyleSheet(
-            f"background:{CONTENT_BG}; border-radius:12px; border-top-left-radius:0; border-top-right-radius:0;")
+            f"background:{CONTENT_BG}; border-radius:12px; border-top-left-radius:0; border-top-right-radius:0;"
+        )
         cl = QVBoxLayout(self.cont)
         cl.setContentsMargins(0, 0, 0, 0)
         self.stack = QStackedWidget()
@@ -827,6 +916,7 @@ class SidebarTabsWidget(QFrame):
         elif tracker:
             self.grp.button(0).setChecked(True)
             self.stack.setCurrentIndex(0)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

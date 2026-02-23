@@ -2,7 +2,7 @@ from pathlib import Path
 import cv2
 from PySide6.QtGui import QShortcut, QKeySequence
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                               QPushButton, QMessageBox)  # Импортируем QMessageBox
+                               QPushButton, QMessageBox)
 from PySide6.QtCore import Qt, Signal, Slot, QThread
 
 # Core
@@ -11,7 +11,9 @@ from src.core.project import Project
 # Services
 from src.services.geometry_storage import GeometryStorageService
 from src.services.statistics_service import StatisticsService
+from src.services.trajectory_export_service import TrajectoryExportService
 from src.ui.components.confirm_dialog import ConfirmDialog
+from src.ui.components.trajectory_export_dialog import TrajectoryExportDialog
 # Threads
 from src.ui.threads.statistics_worker import StatisticsWorker
 # Components
@@ -157,7 +159,7 @@ class VideoMarkingWidget(QWidget):
         self.btn_status.setCheckable(True)
         self.btn_status.setCursor(Qt.PointingHandCursor)
         self.btn_status.setFixedSize(120, 30)
-        self.btn_status.clicked.connect(self.save_data)  # Сразу сохраняем при клике
+        self.btn_status.clicked.connect(self.save_data)
         self.btn_status.setStyleSheet("""
             QPushButton {
                 background-color: #3B3C40; color: #aaa; 
@@ -169,6 +171,22 @@ class VideoMarkingWidget(QWidget):
             }
         """)
         bread_row.addWidget(self.btn_status)
+
+        bread_row.addSpacing(10)
+
+        # --- КНОПКА: ТРАЕКТОРИЯ ---
+        self.btn_trajectory = QPushButton("⬡ Траектория")
+        self.btn_trajectory.setCursor(Qt.PointingHandCursor)
+        self.btn_trajectory.setFixedSize(100, 30)
+        self.btn_trajectory.clicked.connect(self._on_trajectory_clicked)
+        self.btn_trajectory.setStyleSheet("""
+            QPushButton {
+                background-color: #3B3C40; color: #aaa; 
+                border: 1px solid #555; border-radius: 4px; font-weight: bold;
+            }
+            QPushButton:hover { background-color: #45464a; color: white; }
+        """)
+        bread_row.addWidget(self.btn_trajectory)
 
         layout.addLayout(bread_row)
 
@@ -317,6 +335,41 @@ class VideoMarkingWidget(QWidget):
                 bbox = tracking_data[current_frame]
                 self.player.view.update_tracker_box(True, bbox)
         self.btn_status.setChecked(is_marked)
+
+    def _on_trajectory_clicked(self):
+        geometry_items = self.right_panel.geometry_page.get_all_items()
+        
+        dialog = TrajectoryExportDialog(geometry_items, self)
+        dialog.export_clicked.connect(self._on_export_trajectory)
+        dialog.exec()
+
+    def _on_export_trajectory(self, options):
+        tracking_data = self.player.thread.tracking_data
+        geometry_items = self.right_panel.geometry_page.get_all_items()
+        
+        cap = cv2.VideoCapture(str(self.video.path))
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        cap.release()
+        
+        video_size = (width, height)
+        
+        try:
+            TrajectoryExportService.export_image(
+                tracking_data=tracking_data,
+                geometry_items=geometry_items,
+                video_size=video_size,
+                output_path=options["output_path"],
+                format=options["format"],
+                scale=options["scale"],
+                show_trajectory=options["show_trajectory"],
+                show_geometry=options["show_geometry"],
+                selected_geometry_names=options["selected_geometries"],
+                smoothing=options["smoothing"],
+                current_frame=None
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось экспортировать траекторию: {str(e)}")
 
     def cleanup(self):
         """

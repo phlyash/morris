@@ -3,58 +3,125 @@ import numpy as np
 
 from src.config import get_resource_path
 
-try:
-    from ultralytics import YOLO
-except ImportError:
-    YOLO = None
+
+class ONNXTracker:
+    def __init__(self, model_path, conf_threshold=0.3):
+        self.model_path = model_path
+        self.conf_threshold = conf_threshold
+        self.net = None
+        self.input_size = (640, 640)
+        self.last_bbox = None
+        self._load_model()
+
+    def _load_model(self):
+        self.net = cv2.dnn.readNet(self.model_path)
+        self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+        self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+
+    def _preprocess(self, frame):
+        blob = cv2.dnn.blobFromImage(
+            frame, 1/255.0, self.input_size, swapRB=True, crop=False
+        )
+        return blob
+
+    def _postprocess(self, outputs, orig_shape):
+        outputs = np.array(outputs)
+        outputs = outputs.transpose(0, 2, 1)
+        
+        bboxes = []
+        confs = []
+        
+        for output in outputs[0]:
+            if len(output) < 5:
+                continue
+            
+            cx, cy, w, h = output[:4]
+            obj_conf = output[4]
+            
+            if obj_conf < self.conf_threshold:
+                continue
+            
+            x = cx - w/2
+            y = cy - h/2
+            
+            bboxes.append([x, y, w, h])
+            confs.append(float(obj_conf))
+        
+        if not bboxes:
+            return None, None
+        
+        indices = cv2.dnn.NMSBoxes(
+            bboxes, confs, self.conf_threshold, 0.45
+        )
+        
+        if len(indices) > 0:
+            i = indices[0]
+            bbox = bboxes[i]
+            conf = confs[i]
+            return bbox, conf
+        
+        return None, None
+
+    def detect(self, frame):
+        blob = self._preprocess(frame)
+        self.net.setInput(blob)
+        outputs = self.net.forward(self.net.getUnconnectedOutLayersNames())
+        
+        orig_h, orig_w = frame.shape[:2]
+        scale_x = orig_w / self.input_size[0]
+        scale_y = orig_h / self.input_size[1]
+        
+        bbox, conf = self._postprocess(outputs, (orig_h, orig_w))
+        
+        if bbox:
+            x, y, w, h = bbox
+            x = x * scale_x
+            y = y * scale_y
+            w = w * scale_x
+            h = h * scale_y
+            return True, (int(x), int(y), int(w), int(h))
+        
+        return False, None
 
 
 class TrackerWrapper:
     def __init__(self, model_type="csrt", model_path=None):
         if model_path is None:
-            self.model_path = get_resource_path("best.pt")
+            self.model_path = str(get_resource_path("best.onnx"))
+        else:
+            self.model_path = model_path
+            
         self.model_type = model_type.lower()
         self.tracker = None
-        self.yolo_model = None
+        self.onnx_tracker = None
         self.last_bbox = None
 
         if "yolo" in self.model_type:
-            if YOLO:
-                # Загружаем веса один раз при старте
-                self.yolo_model = YOLO(self.model_path)
-            else:
-                pass
+            try:
+                self.onnx_tracker = ONNXTracker(self.model_path)
+            except Exception as e:
+                print(f"Failed to load ONNX model: {e}")
+                self.onnx_tracker = None
 
     def reset(self):
-        """
-        Полный сброс состояния.
-        Вызывается при переходе на неразмеченную область.
-        """
         self.tracker = None
         self.last_bbox = None
 
     def init(self, frame: np.ndarray, bbox: tuple):
-        """
-        Инициализация трекера.
-        """
-        # --- ИСПРАВЛЕНИЕ ---
-        # Принудительно конвертируем в int, чтобы OpenCV не ругался на float
         if bbox:
             bbox = tuple(map(int, bbox))
 
         self.last_bbox = bbox
 
         if "csrt" in self.model_type:
-            if self.tracker is None:  # Или пересоздаем всегда
+            if self.tracker is None:
                 self.tracker = cv2.TrackerCSRT_create()
             else:
-                # Для CSRT лучше пересоздавать, но можно попробовать и так
                 self.tracker = cv2.TrackerCSRT_create()
 
             self.tracker.init(frame, bbox)
 
     def update(self, frame: np.ndarray):
-        # --- CSRT ---
         if "csrt" in self.model_type:
             if self.tracker is None:
                 return False, None
@@ -63,50 +130,34 @@ class TrackerWrapper:
                 return True, tuple(map(int, box))
             return False, None
 
-        # --- YOLO ---
-        elif "yolo" in self.model_type and self.yolo_model:
-            # Запускаем детекцию
-            results = self.yolo_model(frame, verbose=False, conf=0.3)
-
-            best_bbox = None
-
-            # СЦЕНАРИЙ 1: У нас уже есть объект, за которым следим (last_bbox существует)
+        elif "yolo" in self.model_type and self.onnx_tracker:
             if self.last_bbox is not None:
+                best_bbox = None
                 best_iou = 0
-                # Ищем объект по IoU (геометрическому пересечению)
-                for r in results:
-                    for box in r.boxes:
-                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                        curr_box = (int(x1), int(y1), int(x2 - x1), int(y2 - y1))
-
-                        iou = self._calculate_iou(self.last_bbox, curr_box)
-                        if iou > best_iou:
-                            best_iou = iou
-                            best_bbox = curr_box
-
-                # Если IoU слишком маленький, возможно объект потерян
+                
+                success, det_bbox = self.onnx_tracker.detect(frame)
+                
+                if success:
+                    iou = self._calculate_iou(self.last_bbox, det_bbox)
+                    if iou > best_iou:
+                        best_iou = iou
+                        best_bbox = det_bbox
+                
                 if best_bbox is None or best_iou < 0.1:
-                    # Возвращаем False, но НЕ сбрасываем last_bbox полностью,
-                    # вдруг он появится в следующем кадре рядом.
                     return False, self.last_bbox
-
-            # СЦЕНАРИЙ 2: Мы запускаемся с нуля (last_bbox is None)
-            else:
-                max_conf = 0
-                # Ищем объект с максимальной уверенностью (Confidence)
-                for r in results:
-                    for box in r.boxes:
-                        if box.conf.item() > max_conf:
-                            max_conf = box.conf.item()
-                            x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                            best_bbox = (int(x1), int(y1), int(x2 - x1), int(y2 - y1))
-
-            # Если нашли подходящий объект (в любом из сценариев)
-            if best_bbox:
+                
                 self.last_bbox = best_bbox
                 return True, best_bbox
+            else:
+                success, det_bbox = self.onnx_tracker.detect(frame)
+                
+                if success:
+                    self.last_bbox = det_bbox
+                    return True, det_bbox
+                
+                return False, None
 
-            return False, None
+        return False, None
 
     def _calculate_iou(self, boxA, boxB):
         xA = max(boxA[0], boxB[0])

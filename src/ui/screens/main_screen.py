@@ -1,9 +1,19 @@
 from pathlib import Path
+
+from PySide6.QtCore import Signal
 from PySide6.QtGui import QFont, Qt
 from PySide6.QtSvgWidgets import QSvgWidget
-from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QFrame,
-                               QVBoxLayout, QLabel, QScrollArea, QFileDialog, QMessageBox)
-from PySide6.QtCore import Signal
+from PySide6.QtWidgets import (
+    QFileDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from src.config import get_resource_path
 from src.core.app_state import AppState
@@ -31,13 +41,15 @@ class MainWindow(QMainWindow):
         # --- SIDEBAR (Ваш код без изменений) ---
         sidebar = QFrame()
         sidebar.setFixedWidth(250)
-        sidebar.setStyleSheet("background-color: #252526; border-right: 1px solid #333;")
+        sidebar.setStyleSheet(
+            "background-color: #252526; border-right: 1px solid #333;"
+        )
         sb_layout = QVBoxLayout(sidebar)
         sb_layout.setContentsMargins(0, 20, 0, 20)
 
         logo_box = QHBoxLayout()
         logo_box.setContentsMargins(20, 0, 0, 20)
-        logo_img = QSvgWidget(str(get_resource_path('morris.svg')))
+        logo_img = QSvgWidget(str(get_resource_path("morris.svg")))
         logo_img.setFixedSize(40, 40)
         logo_text = QLabel("Morris")
         logo_text.setFont(QFont("Segoe UI", 16, QFont.Bold))
@@ -57,7 +69,12 @@ class MainWindow(QMainWindow):
         c_layout = QVBoxLayout(content)
         c_layout.setContentsMargins(40, 40, 40, 40)
 
-        c_layout.addWidget(QLabel("Проекты", styleSheet="color: white; font-size: 24px; font-weight: bold;"))
+        c_layout.addWidget(
+            QLabel(
+                "Проекты",
+                styleSheet="color: white; font-size: 24px; font-weight: bold;",
+            )
+        )
 
         # -- КНОПКИ ДЕЙСТВИЙ --
         actions = QHBoxLayout()
@@ -76,7 +93,11 @@ class MainWindow(QMainWindow):
         c_layout.addLayout(actions)
 
         # -- НЕДАВНИЕ --
-        c_layout.addWidget(QLabel("Недавние", styleSheet="color: #ddd; font-size: 14px; margin-top: 20px;"))
+        c_layout.addWidget(
+            QLabel(
+                "Недавние", styleSheet="color: #ddd; font-size: 14px; margin-top: 20px;"
+            )
+        )
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -109,7 +130,8 @@ class MainWindow(QMainWindow):
         def new_press(event):
             if event.button() == Qt.LeftButton:
                 callback()
-            if original: original(event)
+            if original:
+                original(event)
 
         widget.mousePressEvent = new_press
         widget.setCursor(Qt.PointingHandCursor)
@@ -117,7 +139,9 @@ class MainWindow(QMainWindow):
     # --- НОВЫЕ МЕТОДЫ ---
 
     def create_project(self):
-        folder = QFileDialog.getExistingDirectory(self, "Выберите папку для нового проекта")
+        folder = QFileDialog.getExistingDirectory(
+            self, "Выберите папку для нового проекта"
+        )
         if not folder:
             return
 
@@ -125,7 +149,9 @@ class MainWindow(QMainWindow):
         morris_dir = path / ".morris"
 
         if morris_dir.exists() and morris_dir.is_dir():
-            QMessageBox.warning(self, "Ошибка", f"Проект уже существует в '{path.name}'")
+            QMessageBox.warning(
+                self, "Ошибка", f"Проект уже существует в '{path.name}'"
+            )
             return
 
         try:
@@ -144,7 +170,8 @@ class MainWindow(QMainWindow):
 
     def open_project_dialog(self):
         folder = QFileDialog.getExistingDirectory(self, "Открыть проект")
-        if not folder: return
+        if not folder:
+            return
 
         path = Path(folder)
         AppState.add_recent(Project(path, path.stem))

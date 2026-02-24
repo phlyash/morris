@@ -1,26 +1,36 @@
 from pathlib import Path
+
 import cv2
-from PySide6.QtGui import QShortcut, QKeySequence
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                               QPushButton, QMessageBox)
-from PySide6.QtCore import Qt, Signal, Slot, QThread
+from PySide6.QtCore import Qt, QThread, Signal, Slot
+from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 # Core
 from src.core import Video
 from src.core.project import Project
+
 # Services
 from src.services.geometry_storage import GeometryStorageService
 from src.services.statistics_service import StatisticsService
 from src.services.trajectory_export_service import TrajectoryExportService
-from src.ui.components.confirm_dialog import ConfirmDialog
-from src.ui.components.trajectory_export_dialog import TrajectoryExportDialog
-# Threads
-from src.ui.threads.statistics_worker import StatisticsWorker
+
 # Components
 from src.ui.components import VideoPlayerWidget
-from src.ui.components.video.graphics_items import EditableGeometryItem
-from src.ui.components.video.video_timeline import VideoTimelineWidget
+from src.ui.components.confirm_dialog import ConfirmDialog
 from src.ui.components.sidebar_tabs import SidebarTabsWidget
+from src.ui.components.trajectory_export_dialog import TrajectoryExportDialog
+from src.ui.components.video.graphics_items import EditableGeometryItem
+from src.ui.components.video.video_timeline_simple import VideoTimelineWidget
+
+# Threads
+from src.ui.threads.statistics_worker import StatisticsWorker
 
 
 class VideoMarkingWidget(QWidget):
@@ -84,7 +94,9 @@ class VideoMarkingWidget(QWidget):
         view.delete_requested.connect(geom_page.delete_selected_items)
         view.items_selection_changed.connect(geom_page.update_from_scene_selection)
         geom_page.selection_changed_requested.connect(view.select_items_by_list)
-        view.items_selection_changed.connect(lambda items: self._reconnect_geometry_signals(items, geom_page))
+        view.items_selection_changed.connect(
+            lambda items: self._reconnect_geometry_signals(items, geom_page)
+        )
 
         # 3. Трекер
         tracker_page = self.right_panel.stack.widget(0)
@@ -97,10 +109,14 @@ class VideoMarkingWidget(QWidget):
         view.tracker_region_selected.connect(self._on_tracker_region_selected)
 
         # Обновление данных
-        self.player.thread.frame_data_updated.connect(self.timeline.model.update_single_frame_bbox)
+        self.player.thread.frame_data_updated.connect(
+            self.timeline.model.update_single_frame_bbox
+        )
         self.player.thread.frame_data_updated.connect(self._check_completion_status)
 
-        self.timeline.model.set_tracking_data_map(self.player.thread.get_tracking_data())
+        self.timeline.model.set_tracking_data_map(
+            self.player.thread.get_tracking_data()
+        )
 
         # 4. Статистика
         self.stats_thread = QThread()
@@ -121,7 +137,9 @@ class VideoMarkingWidget(QWidget):
     def _init_header(self, layout):
         header_layout = QHBoxLayout()
         tag = QLabel(f"  {self.project.name}  ")
-        tag.setStyleSheet("background-color: #3e3e42; color: white; border-radius: 4px; font-weight: bold;")
+        tag.setStyleSheet(
+            "background-color: #3e3e42; color: white; border-radius: 4px; font-weight: bold;"
+        )
         header_layout.addWidget(tag)
         header_layout.addStretch()
         layout.addLayout(header_layout)
@@ -131,7 +149,9 @@ class VideoMarkingWidget(QWidget):
         btn_back.setCursor(Qt.PointingHandCursor)
         btn_back.setFixedSize(30, 30)
         btn_back.clicked.connect(self.on_back_pressed)
-        btn_back.setStyleSheet("color: white; background: transparent; font-size: 20px; border: none;")
+        btn_back.setStyleSheet(
+            "color: white; background: transparent; font-size: 20px; border: none;"
+        )
         lbl = QLabel(self.video.path.name)
         lbl.setStyleSheet("color: white; font-size: 18px; font-weight: bold;")
         bread_row.addWidget(btn_back)
@@ -145,7 +165,7 @@ class VideoMarkingWidget(QWidget):
         self.btn_clear.clicked.connect(self._on_clear_clicked)
         self.btn_clear.setStyleSheet("""
             QPushButton {
-                background-color: #3B3C40; color: #aaa; 
+                background-color: #3B3C40; color: #aaa;
                 border: 1px solid #555; border-radius: 4px; font-weight: bold;
             }
             QPushButton:hover { background-color: #8b0000; color: white; border-color: #8b0000; }
@@ -162,7 +182,7 @@ class VideoMarkingWidget(QWidget):
         self.btn_status.clicked.connect(self.save_data)
         self.btn_status.setStyleSheet("""
             QPushButton {
-                background-color: #3B3C40; color: #aaa; 
+                background-color: #3B3C40; color: #aaa;
                 border: 1px solid #555; border-radius: 4px; font-weight: bold;
             }
             QPushButton:hover { background-color: #45464a; }
@@ -181,7 +201,7 @@ class VideoMarkingWidget(QWidget):
         self.btn_trajectory.clicked.connect(self._on_trajectory_clicked)
         self.btn_trajectory.setStyleSheet("""
             QPushButton {
-                background-color: #3B3C40; color: #aaa; 
+                background-color: #3B3C40; color: #aaa;
                 border: 1px solid #555; border-radius: 4px; font-weight: bold;
             }
             QPushButton:hover { background-color: #45464a; color: white; }
@@ -194,9 +214,12 @@ class VideoMarkingWidget(QWidget):
 
     @Slot()
     def _check_completion_status(self):
-        if self.btn_status.isChecked(): return
-        if not hasattr(self.player.thread, 'total_frames'):
-            self.player.thread.total_frames = int(self.player.thread.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if self.btn_status.isChecked():
+            return
+        if not hasattr(self.player.thread, "total_frames"):
+            self.player.thread.total_frames = int(
+                self.player.thread.cap.get(cv2.CAP_PROP_FRAME_COUNT)
+            )
 
         if len(self.player.thread.tracking_data) >= self.player.thread.total_frames - 5:
             self.btn_status.blockSignals(True)
@@ -210,7 +233,7 @@ class VideoMarkingWidget(QWidget):
         dialog = ConfirmDialog(
             "Сброс разметки",
             "Вы уверены, что хотите удалить всю разметку трекера?\nЭто действие необратимо.",
-            self
+            self,
         )
 
         # exec() возвращает QDialog.Accepted (1) если нажали "Удалить"
@@ -246,7 +269,7 @@ class VideoMarkingWidget(QWidget):
 
     @Slot(int)
     def _on_tab_changed(self, index):
-        is_geometry_tab = (index == 1)
+        is_geometry_tab = index == 1
         self.player.view.set_interaction_enabled(is_geometry_tab)
         if not is_geometry_tab:
             self.right_panel.geometry_page.reset_tool_selection()
@@ -264,12 +287,15 @@ class VideoMarkingWidget(QWidget):
     @Slot(int)
     def _trigger_stats_calculation(self, frame_index):
         # Это для асинхронного обновления UI (пока мы внутри виджета)
-        if self.right_panel.stack.currentIndex() != 2: return
+        if self.right_panel.stack.currentIndex() != 2:
+            return
         tracking_data_copy = self.player.thread.tracking_data.copy()
         ui_items = self.right_panel.geometry_page.get_all_items()
         zones_snapshot = StatisticsService.prepare_geometry_snapshot(ui_items)
         fps = self.player.thread.fps
-        self.request_stats_calculation.emit(tracking_data_copy, zones_snapshot, fps, frame_index)
+        self.request_stats_calculation.emit(
+            tracking_data_copy, zones_snapshot, fps, frame_index
+        )
 
     @Slot(dict, dict)
     def _on_stats_ready(self, global_stats, zones_stats):
@@ -313,14 +339,19 @@ class VideoMarkingWidget(QWidget):
 
         # 3. Сохранение
         is_finished = self.btn_status.isChecked()
-        self.storage_service.save(self.video.path, items, tracking_data, zones_stats_result, is_finished)
+        self.storage_service.save(
+            self.video.path, items, tracking_data, zones_stats_result, is_finished
+        )
 
     def load_data(self):
-        items, tracking_data, is_marked = self.storage_service.load_smart(self.video.path)
+        items, tracking_data, is_marked = self.storage_service.load_smart(
+            self.video.path
+        )
         scene = self.player.view.scene
         geom_page = self.right_panel.geometry_page
         for item in scene.items():
-            if isinstance(item, EditableGeometryItem): scene.removeItem(item)
+            if isinstance(item, EditableGeometryItem):
+                scene.removeItem(item)
         geom_page.list_widget.clear()
         is_enabled = self.player.view.is_interaction_enabled
         for item in items:
@@ -338,7 +369,7 @@ class VideoMarkingWidget(QWidget):
 
     def _on_trajectory_clicked(self):
         geometry_items = self.right_panel.geometry_page.get_all_items()
-        
+
         dialog = TrajectoryExportDialog(geometry_items, self)
         dialog.export_clicked.connect(self._on_export_trajectory)
         dialog.exec()
@@ -346,14 +377,14 @@ class VideoMarkingWidget(QWidget):
     def _on_export_trajectory(self, options):
         tracking_data = self.player.thread.tracking_data
         geometry_items = self.right_panel.geometry_page.get_all_items()
-        
+
         cap = cv2.VideoCapture(str(self.video.path))
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         cap.release()
-        
+
         video_size = (width, height)
-        
+
         try:
             TrajectoryExportService.export_image(
                 tracking_data=tracking_data,
@@ -366,10 +397,12 @@ class VideoMarkingWidget(QWidget):
                 show_geometry=options["show_geometry"],
                 selected_geometry_names=options["selected_geometries"],
                 smoothing=options["smoothing"],
-                current_frame=None
+                current_frame=None,
             )
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось экспортировать траекторию: {str(e)}")
+            QMessageBox.critical(
+                self, "Ошибка", f"Не удалось экспортировать траекторию: {str(e)}"
+            )
 
     def cleanup(self):
         """
@@ -377,14 +410,14 @@ class VideoMarkingWidget(QWidget):
         Использование wait() обязательно, чтобы предотвратить краш.
         """
         # 1. Останавливаем видео (чтобы поток вышел из цикла run)
-        if hasattr(self, 'player'):
-            self.player.stop_video() # Сбрасываем флаг run
-            self.player.cleanup()    # Ждем завершения потока (wait())
+        if hasattr(self, "player"):
+            self.player.stop_video()  # Сбрасываем флаг run
+            self.player.cleanup()  # Ждем завершения потока (wait())
 
         # 2. Останавливаем поток статистики
-        if hasattr(self, 'stats_thread') and self.stats_thread.isRunning():
+        if hasattr(self, "stats_thread") and self.stats_thread.isRunning():
             self.stats_thread.quit()
-            self.stats_thread.wait() # Блокируем GUI пока поток не умрет
+            self.stats_thread.wait()  # Блокируем GUI пока поток не умрет
 
         # 3. Останавливаем таймлайн
         self.timeline.cleanup()

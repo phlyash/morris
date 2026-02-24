@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.core import Video
+from src.ui.components.video.video_timeline_simple import FullVideoLoaderThread
 
 MAX_PENDING_REQUESTS = 30
 PREFETCH_LOOK_AHEAD = 30
@@ -147,7 +148,7 @@ class CachedFramesModel(QAbstractListModel):
 
         self._tracking_data = {}
 
-        self.CACHE_SIZE_LIMIT = 50
+        self.CACHE_SIZE_LIMIT = total_frames
         self.center_index = 0
 
     def set_tracking_data_map(self, data_map):
@@ -172,7 +173,7 @@ class CachedFramesModel(QAbstractListModel):
         start_behind = max(0, center_index - look_behind)
         end_ahead = min(center_index + look_ahead, self.total_frames)
 
-        for i in range(start_behind, end_ahead):
+        for i in range(0, self.total_frames):
             if i not in self._cache and i not in self.loader.pending_indices:
                 indices_to_load.append(i)
 

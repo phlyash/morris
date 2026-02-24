@@ -9,7 +9,7 @@ from src.ui.components.video.graphics_items import EditableGeometryItem
 
 
 class TrajectoryExportService:
-    SMOOTHING_WINDOWS = {"none": 1, "light": 3, "medium": 5, "strong": 9}
+    SMOOTHING_WINDOWS = {"Нет": 1, "Да": 5}
 
     @staticmethod
     def calculate_center(bbox: tuple) -> Tuple[float, float]:
@@ -80,52 +80,54 @@ class TrajectoryExportService:
         return points
 
     @staticmethod
-    def render_to_svg(tracking_data: Dict[int, tuple],
-                     geometry_items: List[EditableGeometryItem],
-                     video_size: Tuple[int, int],
-                     scale: int,
-                     show_trajectory: bool,
-                     show_geometry: bool,
-                     selected_geometry_names: List[str],
-                     smoothing: str,
-                     current_frame: Optional[int] = None,
-                     output_path: str = ""):
-        
+    def render_to_svg(
+        tracking_data: Dict[int, tuple],
+        geometry_items: List[EditableGeometryItem],
+        video_size: Tuple[int, int],
+        scale: int,
+        show_trajectory: bool,
+        show_geometry: bool,
+        selected_geometry_names: List[str],
+        smoothing: str,
+        current_frame: Optional[int] = None,
+        output_path: str = "",
+    ):
+
         width, height = video_size
         scaled_width = width * scale
         scaled_height = height * scale
-        
+
         generator = QSvgGenerator()
         generator.setFileName(output_path)
         generator.setResolution(96)
-        
+
         painter = QPainter()
         painter.begin(generator)
         painter.setRenderHint(QPainter.Antialiasing)
-        
+
         painter.fillRect(0, 0, scaled_width, scaled_height, QColor("#FFFFFF"))
-        
+
         scale_factor = scale
-        
+
         if show_geometry and geometry_items:
             pen = QPen(QColor("#000000"), 1)
             painter.setPen(pen)
             painter.setBrush(Qt.NoBrush)
-            
+
             for item in geometry_items:
                 if item.name not in selected_geometry_names:
                     continue
-                
+
                 geom = TrajectoryExportService._item_to_geometry(item)
                 if geom is None:
                     continue
-                
+
                 rect = item.rect
                 x = (item.x() + rect.x()) * scale_factor
                 y = (item.y() + rect.y()) * scale_factor
                 w = rect.width() * scale_factor
                 h = rect.height() * scale_factor
-                
+
                 if item.shape_type == "square":
                     painter.drawRect(int(x), int(y), int(w), int(h))
                 elif item.shape_type == "circle":
@@ -141,43 +143,55 @@ class TrajectoryExportService:
                     ry_out = h / 2
                     rx_in = rx_out * item.inner_ratio
                     ry_in = ry_out * item.inner_ratio
-                    
+
                     path = QPainterPath()
                     path.addEllipse(QPointF(cx, cy), rx_out, ry_out)
                     path.addEllipse(QPointF(cx, cy), rx_in, ry_in)
                     painter.drawPath(path)
-        
+
         if show_trajectory and tracking_data:
-            points = TrajectoryExportService.get_trajectory_points(tracking_data, current_frame)
-            
+            points = TrajectoryExportService.get_trajectory_points(
+                tracking_data, current_frame
+            )
+
             if smoothing != "none":
                 points = TrajectoryExportService.smooth_trajectory(points, smoothing)
-            
+
             if len(points) > 1:
                 pen = QPen(QColor("#000000"), 2)
                 painter.setPen(pen)
                 painter.setBrush(Qt.NoBrush)
-                
+
                 path = QPainterPath()
                 path.moveTo(points[0][0] * scale_factor, points[0][1] * scale_factor)
-                
+
                 for i in range(1, len(points)):
-                    path.lineTo(points[i][0] * scale_factor, points[i][1] * scale_factor)
-                
+                    path.lineTo(
+                        points[i][0] * scale_factor, points[i][1] * scale_factor
+                    )
+
                 painter.drawPath(path)
-                
+
                 start_point = points[0]
                 end_point = points[-1]
-                
+
                 painter.setBrush(QColor("#00FF00"))
                 painter.setPen(Qt.NoPen)
-                painter.drawEllipse(QPointF(start_point[0] * scale_factor, 
-                                          start_point[1] * scale_factor), 5, 5)
-                
+                painter.drawEllipse(
+                    QPointF(
+                        start_point[0] * scale_factor, start_point[1] * scale_factor
+                    ),
+                    5,
+                    5,
+                )
+
                 painter.setBrush(QColor("#FF0000"))
-                painter.drawEllipse(QPointF(end_point[0] * scale_factor, 
-                                          end_point[1] * scale_factor), 5, 5)
-        
+                painter.drawEllipse(
+                    QPointF(end_point[0] * scale_factor, end_point[1] * scale_factor),
+                    5,
+                    5,
+                )
+
         painter.end()
 
     @staticmethod
@@ -335,7 +349,7 @@ class TrajectoryExportService:
                 selected_geometry_names=selected_geometry_names,
                 smoothing=smoothing,
                 current_frame=current_frame,
-                output_path=output_path
+                output_path=output_path,
             )
         else:
             img_format = "JPEG" if format.lower() in ["jpg", "jpeg"] else "PNG"

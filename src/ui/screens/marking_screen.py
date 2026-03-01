@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import cv2
 from PySide6.QtCore import Qt, QThread, Signal, Slot
 from PySide6.QtGui import QKeySequence, QShortcut
@@ -369,12 +367,36 @@ class VideoMarkingWidget(QWidget):
 
     def _on_trajectory_clicked(self):
         geometry_items = self.right_panel.geometry_page.get_all_items()
+        tracking_data = self.player.thread.tracking_data
+        current_frame = int(self.player.thread.cap.get(cv2.CAP_PROP_POS_FRAMES))
 
-        dialog = TrajectoryExportDialog(geometry_items, self)
-        dialog.export_clicked.connect(self._on_export_trajectory)
+        # Получаем размер видео
+        cap = cv2.VideoCapture(str(self.video.path))
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        cap.release()
+
+        # Загружаем сохранённые настройки компаса из проекта
+        compass_settings = (
+            self.project.compass_settings
+            if hasattr(self.project, "compass_settings")
+            else None
+        )
+
+        dialog = TrajectoryExportDialog(
+            geometry_items=geometry_items,
+            tracking_data=tracking_data,
+            video_size=(width, height),
+            current_frame=current_frame,
+            compass_settings=compass_settings,
+            parent=self,
+        )
+        dialog.export_clicked.connect(
+            lambda options: self._on_export_trajectory(options, dialog)
+        )
         dialog.exec()
 
-    def _on_export_trajectory(self, options):
+    def _on_export_trajectory(self, options, dialog=None):
         tracking_data = self.player.thread.tracking_data
         geometry_items = self.right_panel.geometry_page.get_all_items()
 
@@ -384,6 +406,12 @@ class VideoMarkingWidget(QWidget):
         cap.release()
 
         video_size = (width, height)
+
+        # Сохраняем настройки компаса в проект
+        if dialog is not None:
+            compass_settings = dialog.get_compass_settings()
+            self.project.compass_settings = compass_settings
+            self.project.save_config()
 
         try:
             TrajectoryExportService.export_image(
@@ -398,6 +426,7 @@ class VideoMarkingWidget(QWidget):
                 selected_geometry_names=options["selected_geometries"],
                 smoothing=options["smoothing"],
                 current_frame=None,
+                compass=options.get("compass"),
             )
         except Exception as e:
             QMessageBox.critical(

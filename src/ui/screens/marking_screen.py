@@ -1,5 +1,7 @@
+import math
+
 import cv2
-from PySide6.QtCore import Qt, QThread, Signal, Slot
+from PySide6.QtCore import QPointF, Qt, QThread, QTimer, Signal, Slot
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -22,6 +24,8 @@ from src.services.trajectory_export_service import TrajectoryExportService
 # Components
 from src.ui.components import VideoPlayerWidget
 from src.ui.components.confirm_dialog import ConfirmDialog
+from src.ui.components.ruler_dialog import RulerInputDialog
+from src.ui.components.ruler_item import RulerLineItem
 from src.ui.components.sidebar_tabs import SidebarTabsWidget
 from src.ui.components.trajectory_export_dialog import TrajectoryExportDialog
 from src.ui.components.video.graphics_items import EditableGeometryItem
@@ -40,6 +44,15 @@ class VideoMarkingWidget(QWidget):
         self.video = video
         self.project = project
         self.storage_service = GeometryStorageService(project.path)
+
+        # Per-video масштаб (0 = используется проектный)
+        self._video_scale_factor = 0.0
+        self._load_video_scale()
+
+        # Состояние линейки
+        self._ruler_mode = False
+        self._ruler_start = None
+        self._ruler_item = None
 
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(30, 20, 30, 30)
@@ -66,6 +79,8 @@ class VideoMarkingWidget(QWidget):
         self.right_panel = SidebarTabsWidget()
         self.right_panel.setFixedWidth(360)
 
+        self._update_ruler_ui()
+
         main_layout.addWidget(left_col)
         main_layout.addWidget(self.right_panel)
 
@@ -85,7 +100,7 @@ class VideoMarkingWidget(QWidget):
 
         # 2. Геометрия
         geom_page = self.right_panel.geometry_page
-        geom_page.shape_create_requested.connect(view.set_creation_mode)
+        geom_page.shape_create_requested.connect(self._on_shape_requested)
         view.creation_cancelled.connect(geom_page.reset_tool_selection)
         view.item_created.connect(geom_page.register_new_item)
         geom_page.items_deleted.connect(view.remove_items)
@@ -95,6 +110,10 @@ class VideoMarkingWidget(QWidget):
         view.items_selection_changed.connect(
             lambda items: self._reconnect_geometry_signals(items, geom_page)
         )
+
+        # Линейка (из GeometryPage)
+        geom_page.ruler_toggled.connect(self._on_ruler_toggled)
+        geom_page.ruler_reset.connect(self._on_reset_video_scale)
 
         # 3. Трекер
         tracker_page = self.right_panel.stack.widget(0)
@@ -106,6 +125,11 @@ class VideoMarkingWidget(QWidget):
         tracker_page.manual_setup_toggled.connect(self._on_manual_tracker_toggled)
         view.tracker_region_selected.connect(self._on_tracker_region_selected)
 
+        # Передаём масштаб в статистику
+        stats_page = self.right_panel.stack.widget(2)
+        if hasattr(stats_page, "set_scale_factor"):
+            stats_page.set_scale_factor(self.project.scale_factor)
+
         # Обновление данных
         self.player.thread.frame_data_updated.connect(
             self.timeline.model.update_single_frame_bbox
@@ -115,6 +139,9 @@ class VideoMarkingWidget(QWidget):
         self.timeline.model.set_tracking_data_map(
             self.player.thread.get_tracking_data()
         )
+
+        # Клики по сцене для линейки
+        view.scene_clicked.connect(self._on_scene_click_for_ruler)
 
         # 4. Статистика
         self.stats_thread = QThread()
@@ -131,6 +158,50 @@ class VideoMarkingWidget(QWidget):
         # Старт
         self.load_data()
         self._on_tab_changed(0)
+
+    # ── Масштаб ──
+
+    def _effective_scale_factor(self) -> float:
+        """Возвращает актуальный масштаб: per-video если задан, иначе проектный."""
+        if self._video_scale_factor > 0:
+            return self._video_scale_factor
+        return self.project.scale_factor
+
+    def _is_scale_overridden(self) -> bool:
+        """True если для этого видео задан свой масштаб, отличный от проектного."""
+        return (
+            self._video_scale_factor > 0
+            and self._video_scale_factor != self.project.scale_factor
+        )
+
+    def _load_video_scale(self):
+        """Загружает per-video масштаб из .morris/<video>.scale"""
+        scale_file = self.project.path / ".morris" / f"{self.video.path.stem}.scale"
+        if scale_file.exists():
+            try:
+                self._video_scale_factor = float(scale_file.read_text().strip())
+            except (ValueError, OSError):
+                self._video_scale_factor = 0.0
+
+    def _save_video_scale(self):
+        """Сохраняет per-video масштаб."""
+        scale_file = self.project.path / ".morris" / f"{self.video.path.stem}.scale"
+        morris_dir = self.project.path / ".morris"
+        morris_dir.mkdir(parents=True, exist_ok=True)
+        if self._video_scale_factor > 0:
+            scale_file.write_text(str(self._video_scale_factor))
+        else:
+            if scale_file.exists():
+                scale_file.unlink()
+
+    def _update_ruler_ui(self):
+        self._update_scale_label_only()
+        if hasattr(self, "right_panel"):
+            stats_page = self.right_panel.stack.widget(2)
+            if hasattr(stats_page, "set_scale_factor"):
+                stats_page.set_scale_factor(self._effective_scale_factor())
+
+    # ── Header ──
 
     def _init_header(self, layout):
         header_layout = QHBoxLayout()
@@ -156,7 +227,7 @@ class VideoMarkingWidget(QWidget):
         bread_row.addWidget(lbl)
         bread_row.addStretch()
 
-        # --- НОВАЯ КНОПКА: ОЧИСТИТЬ ---
+        # Сброс разметки
         self.btn_clear = QPushButton("✖ Сброс")
         self.btn_clear.setCursor(Qt.PointingHandCursor)
         self.btn_clear.setFixedSize(80, 30)
@@ -172,7 +243,7 @@ class VideoMarkingWidget(QWidget):
 
         bread_row.addSpacing(10)
 
-        # --- КНОПКА: РАЗМЕЧЕНО ---
+        # Размечено
         self.btn_status = QPushButton("✔ Размечено")
         self.btn_status.setCheckable(True)
         self.btn_status.setCursor(Qt.PointingHandCursor)
@@ -192,7 +263,7 @@ class VideoMarkingWidget(QWidget):
 
         bread_row.addSpacing(10)
 
-        # --- КНОПКА: ТРАЕКТОРИЯ ---
+        # Траектория
         self.btn_trajectory = QPushButton("⬡ Траектория")
         self.btn_trajectory.setCursor(Qt.PointingHandCursor)
         self.btn_trajectory.setFixedSize(100, 30)
@@ -208,7 +279,92 @@ class VideoMarkingWidget(QWidget):
 
         layout.addLayout(bread_row)
 
-    # --- ЛОГИКА ОЧИСТКИ ---
+    def _update_scale_label_only(self):
+        """Обновляет лейбл масштаба в GeometryPage."""
+        if not hasattr(self, "right_panel"):
+            return
+        geom_page = self.right_panel.geometry_page
+        sf = self._effective_scale_factor()
+        if sf > 0:
+            if self._is_scale_overridden():
+                geom_page.update_scale_label(
+                    "⚠ Свой масштаб",
+                    "#d4b765",
+                    "Масштаб этого видео отличается от проектного",
+                )
+            else:
+                geom_page.update_scale_label("✔ Масштаб задан", "#2ea043")
+        else:
+            geom_page.update_scale_label("Масштаб не задан", "#888")
+
+    # ── Линейка ──
+    def _on_shape_requested(self, shape_type):
+        geom_page = self.right_panel.geometry_page
+        if geom_page.btn_ruler.isChecked():
+            geom_page.btn_ruler.setChecked(False)
+        self.player.view.set_creation_mode(shape_type)
+
+    def _on_ruler_toggled(self, checked):
+        self._ruler_mode = checked
+        if checked:
+            self.player.view.set_creation_mode(None)
+            self.player.pause_video()
+            for item in self.player.view.scene.items():
+                if isinstance(item, EditableGeometryItem):
+                    item.set_locked(True)
+            self.player.view.setCursor(Qt.CrossCursor)
+            self._ruler_start = None
+            self._remove_ruler_item()
+        else:
+            is_geom_tab = self.right_panel.stack.currentIndex() == 1
+            for item in self.player.view.scene.items():
+                if isinstance(item, EditableGeometryItem):
+                    item.set_locked(not is_geom_tab)
+            self.player.view.setCursor(Qt.ArrowCursor)
+            self._ruler_start = None
+
+    def _on_scene_click_for_ruler(self, scene_pos):
+        if not self._ruler_mode:
+            return
+        if self._ruler_start is None:
+            self._ruler_start = scene_pos
+            self._remove_ruler_item()
+        else:
+            end = scene_pos
+            self._remove_ruler_item()
+            self._ruler_item = RulerLineItem(self._ruler_start, end)
+            self.player.view.scene.addItem(self._ruler_item)
+            pixel_len = self._ruler_item.pixel_length()
+            self._ruler_start = None
+            self.right_panel.geometry_page.btn_ruler.setChecked(False)
+            if pixel_len > 1:
+                self._show_ruler_dialog(pixel_len)
+
+    def _show_ruler_dialog(self, pixel_length):
+        dialog = RulerInputDialog(pixel_length, self)
+
+        def on_confirmed(real_meters):
+            if real_meters > 0:
+                self._video_scale_factor = pixel_length / real_meters
+                self._save_video_scale()
+                self._update_ruler_ui()
+                QTimer.singleShot(2000, self._remove_ruler_item)
+
+        dialog.value_confirmed.connect(on_confirmed)
+        dialog.exec()
+
+    def _remove_ruler_item(self):
+        if self._ruler_item and self._ruler_item.scene():
+            self._ruler_item.scene().removeItem(self._ruler_item)
+        self._ruler_item = None
+
+    def _on_reset_video_scale(self):
+        self._video_scale_factor = 0.0
+        self._save_video_scale()
+        self._remove_ruler_item()
+        self._update_ruler_ui()
+
+    # ── Логика ──
 
     @Slot()
     def _check_completion_status(self):
@@ -218,29 +374,24 @@ class VideoMarkingWidget(QWidget):
             self.player.thread.total_frames = int(
                 self.player.thread.cap.get(cv2.CAP_PROP_FRAME_COUNT)
             )
-
         if len(self.player.thread.tracking_data) >= self.player.thread.total_frames - 5:
             self.btn_status.blockSignals(True)
             self.btn_status.setChecked(True)
             self.btn_status.blockSignals(False)
-            self.save_data()  # Автосохранение при завершении
+            self.save_data()
 
     @Slot()
     def _on_clear_clicked(self):
-        # Создаем кастомный диалог
         dialog = ConfirmDialog(
             "Сброс разметки",
             "Вы уверены, что хотите удалить всю разметку трекера?\nЭто действие необратимо.",
             self,
         )
-
-        # exec() возвращает QDialog.Accepted (1) если нажали "Удалить"
         if dialog.exec():
             self.player.thread.tracking_data = {}
             self.player.thread.is_tracking_active = False
             if self.player.thread.tracker:
                 self.player.thread.tracker.reset()
-
             self.timeline.model.set_tracking_data_map({})
             self.btn_status.setChecked(False)
             self.player.view.update_tracker_box(False, None)
@@ -284,7 +435,6 @@ class VideoMarkingWidget(QWidget):
 
     @Slot(int)
     def _trigger_stats_calculation(self, frame_index):
-        # Это для асинхронного обновления UI (пока мы внутри виджета)
         if self.right_panel.stack.currentIndex() != 2:
             return
         tracking_data_copy = self.player.thread.tracking_data.copy()
@@ -314,28 +464,14 @@ class VideoMarkingWidget(QWidget):
         self.right_panel.stack.widget(0).btn_manual.setChecked(False)
 
     def save_data(self):
-        """
-        Сохраняет данные.
-        ВАЖНО: Используем синхронный расчет статистики,
-        чтобы данные были готовы ПРЯМО СЕЙЧАС, а не когда-то в потоке.
-        """
-        # 1. Данные
         items = self.right_panel.geometry_page.get_all_items()
         tracking_data = self.player.thread.tracking_data
         fps = self.player.thread.fps
-
-        # Определяем диапазон
         max_frame = max(tracking_data.keys()) if tracking_data else 0
-
-        # 2. Синхронный расчет статистики (прямой вызов сервиса, без потоков)
         zones_snapshot = StatisticsService.prepare_geometry_snapshot(items)
-
-        # Прямой вызов calculate (займет 10-50мс, но гарантирует результат)
         _, zones_stats_result = StatisticsService.calculate(
             tracking_data, zones_snapshot, fps, max_frame
         )
-
-        # 3. Сохранение
         is_finished = self.btn_status.isChecked()
         self.storage_service.save(
             self.video.path, items, tracking_data, zones_stats_result, is_finished
@@ -370,13 +506,11 @@ class VideoMarkingWidget(QWidget):
         tracking_data = self.player.thread.tracking_data
         current_frame = int(self.player.thread.cap.get(cv2.CAP_PROP_POS_FRAMES))
 
-        # Получаем размер видео
         cap = cv2.VideoCapture(str(self.video.path))
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         cap.release()
 
-        # Загружаем сохранённые настройки компаса из проекта
         compass_settings = (
             self.project.compass_settings
             if hasattr(self.project, "compass_settings")
@@ -406,8 +540,11 @@ class VideoMarkingWidget(QWidget):
         cap.release()
 
         video_size = (width, height)
+        export_size = (
+            options.get("export_width", width),
+            options.get("export_height", height),
+        )
 
-        # Сохраняем настройки компаса в проект
         if dialog is not None:
             compass_settings = dialog.get_compass_settings()
             self.project.compass_settings = compass_settings
@@ -420,7 +557,7 @@ class VideoMarkingWidget(QWidget):
                 video_size=video_size,
                 output_path=options["output_path"],
                 format=options["format"],
-                scale=options["scale"],
+                export_size=export_size,
                 show_trajectory=options["show_trajectory"],
                 show_geometry=options["show_geometry"],
                 selected_geometry_names=options["selected_geometries"],
@@ -429,24 +566,13 @@ class VideoMarkingWidget(QWidget):
                 compass=options.get("compass"),
             )
         except Exception as e:
-            QMessageBox.critical(
-                self, "Ошибка", f"Не удалось экспортировать траекторию: {str(e)}"
-            )
+            QMessageBox.critical(self, "Ошибка", f"Не удалось экспортировать: {str(e)}")
 
     def cleanup(self):
-        """
-        Остановка всех процессов перед удалением виджета.
-        Использование wait() обязательно, чтобы предотвратить краш.
-        """
-        # 1. Останавливаем видео (чтобы поток вышел из цикла run)
         if hasattr(self, "player"):
-            self.player.stop_video()  # Сбрасываем флаг run
-            self.player.cleanup()  # Ждем завершения потока (wait())
-
-        # 2. Останавливаем поток статистики
+            self.player.stop_video()
+            self.player.cleanup()
         if hasattr(self, "stats_thread") and self.stats_thread.isRunning():
             self.stats_thread.quit()
-            self.stats_thread.wait()  # Блокируем GUI пока поток не умрет
-
-        # 3. Останавливаем таймлайн
+            self.stats_thread.wait()
         self.timeline.cleanup()

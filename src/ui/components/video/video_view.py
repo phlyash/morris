@@ -1,7 +1,12 @@
 import cv2
-from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QGraphicsRectItem
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtGui import QImage, QPixmap, QPainter, QPen, QColor, QBrush
+from PySide6.QtCore import QPointF, Qt, Signal, Slot
+from PySide6.QtGui import QBrush, QColor, QImage, QPainter, QPen, QPixmap
+from PySide6.QtWidgets import (
+    QGraphicsPixmapItem,
+    QGraphicsRectItem,
+    QGraphicsScene,
+    QGraphicsView,
+)
 
 from src.ui.components.video.graphics_items import EditableGeometryItem
 
@@ -13,6 +18,7 @@ class VideoGraphicsView(QGraphicsView):
     items_selection_changed = Signal(list)
     delete_requested = Signal()
     creation_cancelled = Signal()
+    scene_clicked = Signal(QPointF)
 
     def __init__(self):
         super().__init__()
@@ -51,7 +57,8 @@ class VideoGraphicsView(QGraphicsView):
 
     def update_image(self, cv_img):
         """Обновление изображения из потока"""
-        if cv_img is None: return
+        if cv_img is None:
+            return
 
         # Конвертация BGR -> RGB
         rgb = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
@@ -104,6 +111,9 @@ class VideoGraphicsView(QGraphicsView):
             super().mousePressEvent(event)
             return
 
+        scene_pos = self.mapToScene(event.pos())
+        self.scene_clicked.emit(scene_pos)
+
         if self.current_shape_type or self.is_tracker_setup_mode:
             if event.button() == Qt.LeftButton:
                 pos = self.mapToScene(event.pos())
@@ -117,7 +127,9 @@ class VideoGraphicsView(QGraphicsView):
                     self.temp_item.setRect(pos.x(), pos.y(), 0, 0)
                 else:
                     # Геометрия
-                    self.temp_item = EditableGeometryItem(pos.x(), pos.y(), 0, 0, self.current_shape_type)
+                    self.temp_item = EditableGeometryItem(
+                        pos.x(), pos.y(), 0, 0, self.current_shape_type
+                    )
 
                 self.scene.addItem(self.temp_item)
             return
@@ -131,8 +143,12 @@ class VideoGraphicsView(QGraphicsView):
             h = pos.y() - self.start_pos.y()
 
             x, y = self.start_pos.x(), self.start_pos.y()
-            if w < 0: x += w; w = -w
-            if h < 0: y += h; h = -h
+            if w < 0:
+                x += w
+                w = -w
+            if h < 0:
+                y += h
+                h = -h
 
             if self.is_tracker_setup_mode:
                 self.temp_item.setRect(x, y, w, h)
@@ -145,11 +161,20 @@ class VideoGraphicsView(QGraphicsView):
         if self.temp_item:
             if self.is_tracker_setup_mode:
                 rect = self.temp_item.rect()
-                final_bbox = (int(rect.x()), int(rect.y()), int(rect.width()), int(rect.height()))
+                final_bbox = (
+                    int(rect.x()),
+                    int(rect.y()),
+                    int(rect.width()),
+                    int(rect.height()),
+                )
             else:
                 rect = self.temp_item.rect
-                final_bbox = (int(self.temp_item.x()), int(self.temp_item.y()),
-                              int(rect.width()), int(rect.height()))
+                final_bbox = (
+                    int(self.temp_item.x()),
+                    int(self.temp_item.y()),
+                    int(rect.width()),
+                    int(rect.height()),
+                )
 
             if rect.width() > 5 and rect.height() > 5:
                 if self.is_tracker_setup_mode:
@@ -193,12 +218,14 @@ class VideoGraphicsView(QGraphicsView):
     def select_items_by_list(self, items):
         self.scene.blockSignals(True)
         self.scene.clearSelection()
-        for i in items: i.setSelected(True)
+        for i in items:
+            i.setSelected(True)
         self.scene.blockSignals(False)
 
     def remove_items(self, items):
         for i in items:
-            if i in self.scene.items(): self.scene.removeItem(i)
+            if i in self.scene.items():
+                self.scene.removeItem(i)
 
     def set_interaction_enabled(self, enabled: bool):
         self.is_interaction_enabled = enabled

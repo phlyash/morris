@@ -252,6 +252,8 @@ class GeometryPage(BasePage):
     shape_create_requested = Signal(str)
     selection_changed_requested = Signal(list)
     items_deleted = Signal(list)
+    ruler_toggled = Signal(bool)
+    ruler_reset = Signal()
 
     def __init__(self):
         super().__init__()
@@ -339,7 +341,68 @@ class GeometryPage(BasePage):
             pos_layout.addWidget(w)
         layout.addLayout(pos_layout)
 
+        # 6. Линейка (масштаб)
+        ruler_frame = QFrame()
+        ruler_frame.setStyleSheet("""
+            QFrame {
+                background-color: #2d2d30;
+                border: 1px solid #3e3e42;
+                border-radius: 6px;
+                margin-top: 8px;
+            }
+        """)
+        ruler_layout = QHBoxLayout(ruler_frame)
+        ruler_layout.setContentsMargins(8, 6, 8, 6)
+        ruler_layout.setSpacing(8)
+
+        self.lbl_scale = QLabel("")
+        self.lbl_scale.setStyleSheet("color: #888; font-size: 11px; border: none;")
+        ruler_layout.addWidget(self.lbl_scale)
+
+        ruler_layout.addStretch()
+
+        self.btn_ruler = QPushButton("Линейка")
+        self.btn_ruler.setCheckable(True)
+        self.btn_ruler.setCursor(Qt.PointingHandCursor)
+        self.btn_ruler.setFixedHeight(26)
+        self.btn_ruler.setStyleSheet("""
+            QPushButton {
+                background-color: #3B3C40; color: #ccc;
+                border: 1px solid #555; border-radius: 4px;
+                font-size: 11px; padding: 0 8px;
+            }
+            QPushButton:hover { background-color: #45464a; color: white; }
+            QPushButton:checked {
+                background-color: #FF6B6B; color: white;
+                border: 1px solid #FF6B6B;
+            }
+        """)
+        self.btn_ruler.toggled.connect(self.ruler_toggled.emit)
+        ruler_layout.addWidget(self.btn_ruler)
+
+        self.btn_reset_scale = QPushButton("↺")
+        self.btn_reset_scale.setCursor(Qt.PointingHandCursor)
+        self.btn_reset_scale.setFixedSize(26, 26)
+        self.btn_reset_scale.setToolTip("Сбросить масштаб")
+        self.btn_reset_scale.setStyleSheet("""
+            QPushButton {
+                background-color: #3B3C40; color: #888;
+                border: 1px solid #555; border-radius: 4px; font-size: 12px;
+            }
+            QPushButton:hover { background-color: #555; color: white; }
+        """)
+        self.btn_reset_scale.clicked.connect(self.ruler_reset.emit)
+        ruler_layout.addWidget(self.btn_reset_scale)
+
+        layout.addWidget(ruler_frame)
+
         self._update_color_preview("FFDD78")
+
+    def update_scale_label(self, text: str, color: str = "#888", tooltip: str = ""):
+        """Обновление лейбла масштаба снаружи."""
+        self.lbl_scale.setText(text)
+        self.lbl_scale.setStyleSheet(f"color: {color}; font-size: 11px; border: none;")
+        self.lbl_scale.setToolTip(tooltip)
 
     # --- Event Filter для удаления по Delete в списке ---
     def eventFilter(self, source, event):
@@ -700,7 +763,6 @@ class StatisticsPage(BasePage):
         layout.setSpacing(15)
         layout.setContentsMargins(15, 20, 15, 20)
 
-        # Кеш путей к иконкам (копия из GeometryPage)
         self.shape_paths = {
             "donut": str(get_resource_path("donut.svg")),
             "circle": str(get_resource_path("circle.svg")),
@@ -708,117 +770,135 @@ class StatisticsPage(BasePage):
             "poly": str(get_resource_path("poly.svg")),
         }
 
-        # 1. Заголовок
         lbl_global = QLabel("Общая статистика")
         lbl_global.setStyleSheet("font-weight: bold; font-size: 14px; color: #FFDD78;")
         layout.addWidget(lbl_global)
 
-        # Данные
-        self.lbl_total_time = QLabel("Время: 0.00 с")
-        self.lbl_total_dist = QLabel("Дистанция: 0.00 px")
+        self.lbl_total_time = QLabel("Время: —")
+        self.lbl_total_dist = QLabel("Дистанция: —")
         layout.addWidget(self.lbl_total_time)
         layout.addWidget(self.lbl_total_dist)
 
         layout.addSpacing(15)
 
-        # 2. Таблица
         lbl_zones = QLabel("По зонам")
         lbl_zones.setStyleSheet("font-weight: bold; font-size: 14px; color: #FFDD78;")
         layout.addWidget(lbl_zones)
 
         self.table = QTableWidget()
         self.table.setColumnCount(5)
+        # Заголовки обновятся в set_scale_factor / update_data
         self.table.setHorizontalHeaderLabels(
-            ["Зона", "Время", "Дист.", "Время %", "Дист. %"]
+            ["Зона", "Время, с", "Дист.", "Время, %", "Дист., %"]
         )
 
-        # Стиль: убираем сетку, делаем прозрачный фон, чтобы выглядело как список
         self.table.setStyleSheet("""
             QTableWidget {
-                background-color: #2d2d30;
-                border: 1px solid #444;
-                gridline-color: #3a3a3a;
-                font-family: 'Segoe UI'; font-size: 13px;
+                background-color: #2d2d30; border: 1px solid #444;
+                gridline-color: #3a3a3a; font-family: 'Segoe UI'; font-size: 13px;
             }
             QHeaderView::section {
-                background-color: #333;
-                color: #aaa;
-                padding: 4px;
-                border: none;
-                font-weight: bold;
+                background-color: #333; color: #aaa; padding: 4px;
+                border: none; font-weight: bold;
             }
-            QTableWidget::item {
-                padding: 5px;
-                color: white;
-            }
+            QTableWidget::item { padding: 5px; color: white; }
         """)
 
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        for c in range(1, 5):
+            header.setSectionResizeMode(c, QHeaderView.ResizeToContents)
 
         self.table.verticalHeader().setVisible(False)
-        # Убираем возможность выделять ячейки
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
         self.table.setFocusPolicy(Qt.NoFocus)
 
         layout.addWidget(self.table)
 
+        self._scale_factor = 0.0
+
+    def set_scale_factor(self, scale_factor: float):
+        self._scale_factor = scale_factor
+        self._update_headers()
+
+    def _update_headers(self):
+        if self._scale_factor > 0:
+            self.table.setHorizontalHeaderLabels(
+                ["Зона", "Время, с", "Дист., м", "Время, %", "Дист., %"]
+            )
+        else:
+            self.table.setHorizontalHeaderLabels(
+                ["Зона", "Время, с", "Дист.", "Время, %", "Дист., %"]
+            )
+
+    def _convert_dist(self, px_value: float):
+        """Возвращает float в метрах или None если не откалибровано."""
+        if self._scale_factor > 0:
+            return px_value / self._scale_factor
+        return None
+
     def update_data(self, global_stats, zones_stats):
-        """Метод обновления UI"""
         t = global_stats["total_time"]
-        d = global_stats["total_distance"]
+        d_px = global_stats["total_distance"]
+
+        self._update_headers()
+
         self.lbl_total_time.setText(f"Время: {t:.2f} с")
-        self.lbl_total_dist.setText(f"Дистанция: {d:.1f} px")
+
+        d = self._convert_dist(d_px)
+        if d is not None:
+            self.lbl_total_dist.setText(f"Дистанция: {d:.2f} м")
+        else:
+            self.lbl_total_dist.setText("Дистанция: —")
 
         self.table.setRowCount(len(zones_stats))
-
         sorted_zones = sorted(zones_stats.items(), key=lambda x: x[0])
 
         for row, (name, data) in enumerate(sorted_zones):
+            # Имя + иконка
             item_name = QTableWidgetItem(name)
-
             shape_type = data.get("shape", "square")
             color_hex = data.get("color", "#ffffff")
             path = self.shape_paths.get(shape_type, "")
-
             if path:
                 base_pix = svg_to_pixmap(path, 64, 64)
                 colored_pix = recolor_pixmap(base_pix, color_hex)
-                icon = QIcon(colored_pix)
-                item_name.setIcon(icon)
-
+                item_name.setIcon(QIcon(colored_pix))
             item_name.setFlags(Qt.ItemIsEnabled)
             self.table.setItem(row, 0, item_name)
 
-            item_time = QTableWidgetItem(f"{data['time']:.2f} с")
+            # Время
+            item_time = QTableWidgetItem(f"{data['time']:.2f}")
             item_time.setTextAlignment(Qt.AlignCenter)
             item_time.setFlags(Qt.ItemIsEnabled)
             self.table.setItem(row, 1, item_time)
 
-            item_dist = QTableWidgetItem(f"{data['dist']:.0f}")
+            # Дистанция
+            zone_dist = self._convert_dist(data["dist"])
+            if zone_dist is not None:
+                item_dist = QTableWidgetItem(f"{zone_dist:.2f}")
+            else:
+                item_dist = QTableWidgetItem("—")
             item_dist.setTextAlignment(Qt.AlignCenter)
             item_dist.setFlags(Qt.ItemIsEnabled)
             self.table.setItem(row, 2, item_dist)
 
+            # Время %
             pct_time = (data["time"] / t * 100) if t > 0 else 0
-            pct_dist = (data["dist"] / d * 100) if d > 0 else 0
-
             item_pct_time = QTableWidgetItem(f"{pct_time:.1f}")
             item_pct_time.setTextAlignment(Qt.AlignCenter)
             item_pct_time.setFlags(Qt.ItemIsEnabled)
             self.table.setItem(row, 3, item_pct_time)
 
-            item_pct_dist = QTableWidgetItem(f"{pct_dist:.1f}")
+            # Дистанция %
+            if d is not None and d > 0 and zone_dist is not None:
+                pct_dist = zone_dist / d * 100
+                item_pct_dist = QTableWidgetItem(f"{pct_dist:.1f}")
+            else:
+                item_pct_dist = QTableWidgetItem("—")
             item_pct_dist.setTextAlignment(Qt.AlignCenter)
             item_pct_dist.setFlags(Qt.ItemIsEnabled)
             self.table.setItem(row, 4, item_pct_dist)
-
-
-# ... (импорты те же)
 
 
 class SidebarTabsWidget(QFrame):

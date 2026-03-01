@@ -4,7 +4,7 @@ from pathlib import Path
 
 import cv2
 from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QColor, QCursor
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -41,13 +41,26 @@ class StatisticsLoader(QThread):
             return
 
         total_vids = len(self.project.videos)
+        project_sf = self.project.scale_factor
 
         for i, video in enumerate(self.project.videos):
+            # Per-video масштаб
+            scale_file = morris_dir / f"{video.path.stem}.scale"
+            if scale_file.exists():
+                try:
+                    sf = float(scale_file.read_text().strip())
+                except (ValueError, OSError):
+                    sf = project_sf
+            else:
+                sf = project_sf
+
+            calibrated = sf > 0
+
             row_data = {
                 "name": video.path.name,
                 "is_marked": False,
                 "total_time": 0.0,
-                "total_dist": 0.0,
+                "total_dist": None,
                 "zones": {},
             }
 
@@ -73,11 +86,11 @@ class StatisticsLoader(QThread):
                                     "name": stat.name,
                                     "geom": stat.geometry,
                                     "time": 0.0,
-                                    "dist": 0.0,
+                                    "dist_px": 0.0,
                                 }
                             )
 
-                    total_dist = 0.0
+                    total_dist_px = 0.0
                     total_frames = 0
                     prev_center = None
                     frame_time = 1.0 / fps
@@ -87,40 +100,48 @@ class StatisticsLoader(QThread):
                         for rect in block.rects:
                             cx = rect[0] + rect[2] / 2
                             cy = rect[1] + rect[3] / 2
-
                             step_dist = 0.0
                             if prev_center:
                                 step_dist = math.hypot(
                                     cx - prev_center[0], cy - prev_center[1]
                                 )
-                                total_dist += step_dist
-
+                                total_dist_px += step_dist
                             for zone in active_zones:
                                 if zone["geom"].contains(cx, cy):
                                     zone["time"] += frame_time
-                                    zone["dist"] += step_dist
-
+                                    zone["dist_px"] += step_dist
                             prev_center = (cx, cy)
-
                         prev_center = None
 
                     row_data["is_marked"] = mor.get_marked_status()
                     row_data["total_time"] = total_frames / fps
-                    row_data["total_dist"] = total_dist
+
+                    if calibrated:
+                        row_data["total_dist"] = total_dist_px / sf
+                    else:
+                        row_data["total_dist"] = None
 
                     for zone in active_zones:
                         zone_time = zone["time"]
-                        zone_dist = zone["dist"]
+                        if calibrated:
+                            zone_dist = zone["dist_px"] / sf
+                        else:
+                            zone_dist = None
+
                         pct_time = (
                             (zone_time / row_data["total_time"] * 100)
                             if row_data["total_time"] > 0
                             else 0
                         )
-                        pct_dist = (
-                            (zone_dist / row_data["total_dist"] * 100)
-                            if row_data["total_dist"] > 0
-                            else 0
-                        )
+                        if (
+                            calibrated
+                            and row_data["total_dist"]
+                            and row_data["total_dist"] > 0
+                        ):
+                            pct_dist = zone_dist / row_data["total_dist"] * 100
+                        else:
+                            pct_dist = None
+
                         row_data["zones"][zone["name"]] = {
                             "time": zone_time,
                             "dist": zone_dist,
@@ -158,6 +179,7 @@ class ProjectStatisticsWidget(QWidget):
         lbl_title = QLabel("Статистика проекта")
         lbl_title.setStyleSheet("color: white; font-size: 24px; font-weight: bold;")
         header.addWidget(lbl_title)
+
         header.addStretch()
 
         btn_style = """
@@ -191,47 +213,29 @@ class ProjectStatisticsWidget(QWidget):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setAlternatingRowColors(True)
-        self.table.setFocusPolicy(
-            Qt.NoFocus
-        )  # Убираем фокус с таблицы, чтобы не было рамок
+        self.table.setFocusPolicy(Qt.NoFocus)
 
-        # ИСПРАВЛЕННЫЙ СТИЛЬ:
-        # 1. outline: 0 - убирает пунктирную рамку фокуса
-        # 2. selection-background-color - задает нормальный цвет выделения вместо желтого
         self.table.setStyleSheet("""
             QTableWidget {
-                background-color: #252526;
-                border: 1px solid #3e3e42;
-                color: #ccc;
-                gridline-color: #3e3e42;
+                background-color: #252526; border: 1px solid #3e3e42;
+                color: #ccc; gridline-color: #3e3e42;
                 alternate-background-color: #2a2a2e;
-                outline: 0;
-                selection-background-color: #444448;
-                selection-color: white;
+                outline: 0; selection-background-color: #444448; selection-color: white;
             }
             QHeaderView::section {
-                background-color: #333;
-                color: white;
-                padding: 6px;
-                border: none;
-                font-weight: bold;
-                border-right: 1px solid #3e3e42;
+                background-color: #333; color: white; padding: 6px;
+                border: none; font-weight: bold; border-right: 1px solid #3e3e42;
             }
             QTableWidget::item { padding: 5px; }
         """)
 
-        self.table.setFocusPolicy(Qt.NoFocus)
-
         self.table.cellDoubleClicked.connect(self._on_table_clicked)
-
         layout.addWidget(self.table)
 
         # --- PROGRESS ---
         self.progress_bar = QProgressBar()
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setFixedHeight(4)
-        # Сменил цвет чанка на зеленый (#00FF00) или нейтральный, чтобы не раздражал.
-        # Если хотите желтый, верните #d4b765.
         self.progress_bar.setStyleSheet("""
             QProgressBar { background: #333; border: none; }
             QProgressBar::chunk { background: #d4b765; }
@@ -239,34 +243,25 @@ class ProjectStatisticsWidget(QWidget):
         self.progress_bar.setVisible(False)
         layout.addWidget(self.progress_bar)
 
-        # Автозагрузка
         self.refresh_data()
 
     def _on_table_clicked(self, row, col):
-        """Обработка клика по ячейке"""
-        # Если кликнули по первой колонке (Имя видео)
         if col == 0:
             item = self.table.item(row, 0)
             if item:
-                video_name = item.text()
-                self.video_requested.emit(video_name)
+                self.video_requested.emit(item.text())
 
     def refresh_data(self):
         if self.loader is not None:
             if self.loader.isRunning():
                 self.loader.requestInterruption()
                 self.loader.wait()
-            self.loader.deleteLater()  # Удаляем объект C++
+            self.loader.deleteLater()
             self.loader = None
-
-        self.loader = StatisticsLoader(self.project)  # Создаем новый
 
         self.btn_refresh.setEnabled(False)
         self.btn_export.setEnabled(False)
-
-        # ИСПРАВЛЕНИЕ: Не сбрасываем колонки в 0, чтобы таблица не схлопывалась
         self.table.setRowCount(0)
-        # self.table.setColumnCount(0) <-- ЭТО БЫЛО ПРИЧИНОЙ МЕРЦАНИЯ ЛЕЙАУТА
 
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
@@ -276,20 +271,36 @@ class ProjectStatisticsWidget(QWidget):
         self.loader.finished.connect(self._on_data_loaded)
         self.loader.start()
 
+    @staticmethod
+    def _fmt_dist(val):
+        """Форматирует дистанцию: None → '-', число → '1.23'"""
+        if val is None:
+            return "-"
+        return f"{val:.2f}"
+
+    @staticmethod
+    def _fmt_pct(val):
+        if val is None:
+            return "-"
+        return f"{val:.1f}"
+
     def _on_data_loaded(self, rows, unique_zones):
         self.rows_data = rows
         self.zone_columns = unique_zones
 
-        headers = ["Видео", "Размечено", "Время (общ)", "Дист. (общ)"]
-        for zone_name in unique_zones:
-            headers.append(f"Время ({zone_name})")
-            headers.append(f"Дист. ({zone_name})")
-            headers.append(f"Время % ({zone_name})")
-            headers.append(f"Дист. % ({zone_name})")
+        calibrated = self.project.is_calibrated
+
+        # Заголовки
+        dist_label = "Дист., м" if calibrated else "Дист."
+        headers = ["Видео", "Размечено", "Время, с", dist_label]
+        for z in unique_zones:
+            headers.append(f"Время, с ({z})")
+            headers.append(f"{'Дист., м' if calibrated else 'Дист.'} ({z})")
+            headers.append(f"Время, % ({z})")
+            headers.append(f"{'Дист., %' if calibrated else 'Дист., %'} ({z})")
 
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)
-
         self.table.setRowCount(len(rows))
 
         for i, row in enumerate(rows):
@@ -303,45 +314,46 @@ class ProjectStatisticsWidget(QWidget):
 
             status_txt = "Да" if row["is_marked"] else "Нет"
             item_status = QTableWidgetItem(status_txt)
-            if row["is_marked"]:
-                item_status.setForeground(QColor("#00FF00"))
-            else:
-                item_status.setForeground(QColor("#666"))
+            item_status.setForeground(
+                QColor("#00FF00") if row["is_marked"] else QColor("#666")
+            )
             item_status.setTextAlignment(Qt.AlignCenter)
             self.table.setItem(i, col, item_status)
             col += 1
 
             self.table.setItem(i, col, QTableWidgetItem(f"{row['total_time']:.2f}"))
             col += 1
-            self.table.setItem(i, col, QTableWidgetItem(f"{row['total_dist']:.0f}"))
+
+            self.table.setItem(
+                i, col, QTableWidgetItem(self._fmt_dist(row["total_dist"]))
+            )
             col += 1
 
             for zone_name in unique_zones:
                 if zone_name in row["zones"]:
-                    z_data = row["zones"][zone_name]
-                    t_val = f"{z_data['time']:.2f}"
-                    d_val = f"{z_data['dist']:.0f}"
-                    pct_t_val = f"{z_data.get('pct_time', 0):.1f}"
-                    pct_d_val = f"{z_data.get('pct_dist', 0):.1f}"
+                    z = row["zones"][zone_name]
+                    self.table.setItem(i, col, QTableWidgetItem(f"{z['time']:.2f}"))
+                    col += 1
+                    self.table.setItem(
+                        i, col, QTableWidgetItem(self._fmt_dist(z["dist"]))
+                    )
+                    col += 1
+                    self.table.setItem(i, col, QTableWidgetItem(f"{z['pct_time']:.1f}"))
+                    col += 1
+                    self.table.setItem(
+                        i, col, QTableWidgetItem(self._fmt_pct(z["pct_dist"]))
+                    )
+                    col += 1
                 else:
-                    t_val, d_val = "-", "-"
-                    pct_t_val, pct_d_val = "-", "-"
+                    for _ in range(4):
+                        self.table.setItem(i, col, QTableWidgetItem("-"))
+                        col += 1
 
-                self.table.setItem(i, col, QTableWidgetItem(t_val))
-                col += 1
-                self.table.setItem(i, col, QTableWidgetItem(d_val))
-                col += 1
-                self.table.setItem(i, col, QTableWidgetItem(pct_t_val))
-                col += 1
-                self.table.setItem(i, col, QTableWidgetItem(pct_d_val))
-                col += 1
-
-        # Ресайз
-        header = self.table.horizontalHeader()
+        h = self.table.horizontalHeader()
         if self.table.columnCount() > 0:
-            header.setSectionResizeMode(0, QHeaderView.Stretch)
+            h.setSectionResizeMode(0, QHeaderView.Stretch)
             for c in range(1, self.table.columnCount()):
-                header.setSectionResizeMode(c, QHeaderView.ResizeToContents)
+                h.setSectionResizeMode(c, QHeaderView.ResizeToContents)
 
         self.progress_bar.setVisible(False)
         self.btn_refresh.setEnabled(True)
@@ -354,16 +366,19 @@ class ProjectStatisticsWidget(QWidget):
         if not path:
             return
 
+        calibrated = self.project.is_calibrated
+        dist_h = "Distance (m)" if calibrated else "Distance"
+
         try:
             with open(path, "w", newline="", encoding="utf-8-sig") as f:
                 writer = csv.writer(f, delimiter=";")
 
-                headers = ["Video", "Is Marked", "Total Time", "Total Distance"]
-                for zone in self.zone_columns:
-                    headers.append(f"Time [{zone}]")
-                    headers.append(f"Dist [{zone}]")
-                    headers.append(f"Time % [{zone}]")
-                    headers.append(f"Dist % [{zone}]")
+                headers = ["Video", "Is Marked", "Total Time (s)", f"Total {dist_h}"]
+                for z in self.zone_columns:
+                    headers.append(f"Time (s) [{z}]")
+                    headers.append(f"{dist_h} [{z}]")
+                    headers.append(f"Time % [{z}]")
+                    headers.append(f"Dist % [{z}]")
                 writer.writerow(headers)
 
                 for row in self.rows_data:
@@ -371,29 +386,31 @@ class ProjectStatisticsWidget(QWidget):
                         row["name"],
                         "Yes" if row["is_marked"] else "No",
                         f"{row['total_time']:.3f}".replace(".", ","),
-                        f"{row['total_dist']:.3f}".replace(".", ","),
                     ]
+
+                    if row["total_dist"] is not None:
+                        csv_row.append(f"{row['total_dist']:.3f}".replace(".", ","))
+                    else:
+                        csv_row.append("")
 
                     for zone_name in self.zone_columns:
                         if zone_name in row["zones"]:
-                            z_data = row["zones"][zone_name]
-                            csv_row.append(f"{z_data['time']:.3f}".replace(".", ","))
-                            csv_row.append(f"{z_data['dist']:.3f}".replace(".", ","))
-                            csv_row.append(
-                                f"{z_data.get('pct_time', 0):.1f}".replace(".", ",")
-                            )
-                            csv_row.append(
-                                f"{z_data.get('pct_dist', 0):.1f}".replace(".", ",")
-                            )
+                            z = row["zones"][zone_name]
+                            csv_row.append(f"{z['time']:.3f}".replace(".", ","))
+                            if z["dist"] is not None:
+                                csv_row.append(f"{z['dist']:.3f}".replace(".", ","))
+                            else:
+                                csv_row.append("")
+                            csv_row.append(f"{z['pct_time']:.1f}".replace(".", ","))
+                            if z["pct_dist"] is not None:
+                                csv_row.append(f"{z['pct_dist']:.1f}".replace(".", ","))
+                            else:
+                                csv_row.append("")
                         else:
-                            csv_row.append("0")
-                            csv_row.append("0")
-                            csv_row.append("0")
-                            csv_row.append("0")
+                            csv_row.extend(["", "", "", ""])
 
                     writer.writerow(csv_row)
-
-        except Exception as e:
+        except Exception:
             pass
 
     def cleanup(self):

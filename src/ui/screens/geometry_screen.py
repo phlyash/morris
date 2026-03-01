@@ -1,15 +1,23 @@
-import cv2
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel)
-from PySide6.QtCore import Qt, Slot
+import math
 
-# Core
+import cv2
+from PySide6.QtCore import QPointF, Qt, Slot
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
+
 from src.core.project import Project
-# Services
 from src.services.geometry_storage import GeometryStorageService
-# Components
-from src.ui.components.video.video_view import VideoGraphicsView
+from src.ui.components.ruler_dialog import RulerInputDialog
+from src.ui.components.ruler_item import RulerLineItem
 from src.ui.components.sidebar_tabs import SidebarTabsWidget
 from src.ui.components.video.graphics_items import EditableGeometryItem
+from src.ui.components.video.video_view import VideoGraphicsView
 
 
 class ProjectGeometryWidget(QWidget):
@@ -18,94 +26,86 @@ class ProjectGeometryWidget(QWidget):
         self.project = project
         self.storage_service = GeometryStorageService(project.path)
 
+        self._ruler_mode = False
+        self._ruler_start = None
+        self._ruler_item = None
+
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(30, 20, 30, 30)
         main_layout.setSpacing(20)
 
-        # === ЛЕВАЯ ЧАСТЬ (Только View) ===
+        # === ЛЕВАЯ ЧАСТЬ ===
         left_col = QWidget()
         left_layout = QVBoxLayout(left_col)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(10)
 
-        # Хедер
+        header_layout = QHBoxLayout()
         header_label = QLabel("Базовая геометрия проекта")
         header_label.setStyleSheet("color: white; font-size: 24px; font-weight: bold;")
-        left_layout.addWidget(header_label)
+        header_layout.addWidget(header_label)
+        header_layout.addStretch()
+        left_layout.addLayout(header_layout)
 
-        # Подзаголовок
         sub_label = QLabel("Настройка зон на примере первого видео")
         sub_label.setStyleSheet("color: #aaa; font-size: 14px;")
         left_layout.addWidget(sub_label)
 
-        # Графическая сцена (без плеера и таймлайна)
         self.view = VideoGraphicsView()
         left_layout.addWidget(self.view)
 
         main_layout.addWidget(left_col, stretch=1)
 
-        # === ПРАВАЯ ЧАСТЬ (Сайдбар) ===
+        # === ПРАВАЯ ЧАСТЬ ===
         self.sidebar = SidebarTabsWidget()
         self.sidebar.setFixedWidth(360)
-
-        # НАСТРОЙКА: Оставляем только вкладку Геометрии
         self.sidebar.set_tabs_visible(tracker=False, geometry=True, stats=False)
-
         main_layout.addWidget(self.sidebar)
 
-        # === ЗАГРУЗКА ПЕРВОГО КАДРА ===
+        # === ЗАГРУЗКА ===
         self.current_video_path = None
         self._load_first_video_frame()
 
         # === ЛОГИКА ГЕОМЕТРИИ ===
-        # Подключаем сигналы так же, как в MarkingScreen, но только для геометрии
         geom_page = self.sidebar.geometry_page
-
-        # Инструменты
-        geom_page.shape_create_requested.connect(self.view.set_creation_mode)
+        geom_page.shape_create_requested.connect(self._on_shape_requested)
         self.view.creation_cancelled.connect(geom_page.reset_tool_selection)
-
-        # Создание/Удаление
         self.view.item_created.connect(geom_page.register_new_item)
         geom_page.items_deleted.connect(self.view.remove_items)
         self.view.delete_requested.connect(geom_page.delete_selected_items)
-
-        # Синхронизация выделения
         self.view.items_selection_changed.connect(geom_page.update_from_scene_selection)
         geom_page.selection_changed_requested.connect(self.view.select_items_by_list)
+        self.view.items_selection_changed.connect(
+            lambda items: self._reconnect_geometry_signals(items, geom_page)
+        )
 
-        # Обновление координат
-        self.view.items_selection_changed.connect(lambda items: self._reconnect_geometry_signals(items, geom_page))
+        # Линейка
+        geom_page.ruler_toggled.connect(self._on_ruler_toggled)
+        geom_page.ruler_reset.connect(self._on_reset_calibration)
 
-        # Включаем взаимодействие (так как вкладка геометрии активна всегда)
         self.view.set_interaction_enabled(True)
+        self.view.scene_clicked.connect(self._on_scene_click_for_ruler)
 
-        # Загружаем существующие данные
         self.load_data()
+        self._update_calibration_label()
 
-        # Автосохранение при любых изменениях (опционально)
-        # Или добавить кнопку сохранения.
-        # Для простоты используем ту же логику сохранения, что и раньше,
-        # но можно добавить кнопку "Сохранить" в header_label layout.
+    def _on_shape_requested(self, shape_type):
+        geom_page = self.sidebar.geometry_page
+        if geom_page.btn_ruler.isChecked():
+            geom_page.btn_ruler.setChecked(False)
+        self.view.set_creation_mode(shape_type)
 
     def _load_first_video_frame(self):
         if not self.project.videos:
-            return  # Нет видео в проекте
-
-        # Сортируем по имени и берем первое
+            return
         sorted_videos = sorted(self.project.videos, key=lambda v: v.path.name)
         first_video = sorted_videos[0]
         self.current_video_path = first_video.path
-
-        # Читаем 0-й кадр
-        cap = cv2.VideoCapture(self.current_video_path)
+        cap = cv2.VideoCapture(str(self.current_video_path))
         ret, frame = cap.read()
         cap.release()
-
         if ret:
             self.view.update_image(frame)
-        else:
-            pass
 
     def _reconnect_geometry_signals(self, items, geom_page):
         if len(items) == 1:
@@ -122,27 +122,87 @@ class ProjectGeometryWidget(QWidget):
                 except:
                     pass
 
-    def save_data(self):
-        """Сохраняем геометрию в .morproj И ВО ВСЕ .mor файлы проекта"""
-        items = self.sidebar.geometry_page.get_all_items()
+    # ── Линейка ──
 
-        # Используем метод распространения
+    def _on_ruler_toggled(self, checked):
+        self._ruler_mode = checked
+        if checked:
+            self.view.set_creation_mode(None)
+            for item in self.view.scene.items():
+                if isinstance(item, EditableGeometryItem):
+                    item.set_locked(True)
+            self.view.setCursor(Qt.CrossCursor)
+            self._ruler_start = None
+            self._remove_ruler_item()
+        else:
+            for item in self.view.scene.items():
+                if isinstance(item, EditableGeometryItem):
+                    item.set_locked(False)
+            self.view.setCursor(Qt.ArrowCursor)
+            self._ruler_start = None
+
+    def _on_scene_click_for_ruler(self, scene_pos):
+        if not self._ruler_mode:
+            return
+        if self._ruler_start is None:
+            self._ruler_start = scene_pos
+            self._remove_ruler_item()
+        else:
+            end = scene_pos
+            self._remove_ruler_item()
+            self._ruler_item = RulerLineItem(self._ruler_start, end)
+            self.view.scene.addItem(self._ruler_item)
+            pixel_len = self._ruler_item.pixel_length()
+            self._ruler_start = None
+            self.sidebar.geometry_page.btn_ruler.setChecked(False)
+            if pixel_len > 1:
+                self._show_ruler_dialog(pixel_len)
+
+    def _show_ruler_dialog(self, pixel_length):
+        dialog = RulerInputDialog(pixel_length, self)
+
+        def on_confirmed(real_meters):
+            if real_meters > 0:
+                self.project.scale_factor = pixel_length / real_meters
+                self.project.save_config()
+                self._update_calibration_label()
+                from PySide6.QtCore import QTimer
+
+                QTimer.singleShot(2000, self._remove_ruler_item)
+
+        dialog.value_confirmed.connect(on_confirmed)
+        dialog.exec()
+
+    def _remove_ruler_item(self):
+        if self._ruler_item and self._ruler_item.scene():
+            self._ruler_item.scene().removeItem(self._ruler_item)
+        self._ruler_item = None
+
+    def _on_reset_calibration(self):
+        self.project.scale_factor = 0.0
+        self.project.save_config()
+        self._remove_ruler_item()
+        self._update_calibration_label()
+
+    def _update_calibration_label(self):
+        geom_page = self.sidebar.geometry_page
+        if self.project.is_calibrated:
+            geom_page.update_scale_label("✔ Масштаб задан", "#2ea043")
+        else:
+            geom_page.update_scale_label("Масштаб не задан", "#888")
+
+    def save_data(self):
+        items = self.sidebar.geometry_page.get_all_items()
         self.storage_service.propagate_base_geometry(items)
 
     def load_data(self):
-        """Загружаем из .morproj"""
-        # Используем специальный метод для загрузки шаблона
         items = self.storage_service.load_project_settings()
-
         scene = self.view.scene
         geom_page = self.sidebar.geometry_page
-
-        # Очистка
         for item in scene.items():
-            if isinstance(item, EditableGeometryItem): scene.removeItem(item)
+            if isinstance(item, EditableGeometryItem):
+                scene.removeItem(item)
         geom_page.list_widget.clear()
-
-        # Добавление
         for item in items:
             scene.addItem(item)
             geom_page.add_existing_item(item)

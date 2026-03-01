@@ -4,7 +4,6 @@ from typing import Dict, List, Optional, Tuple
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QColor,
-    QCursor,
     QFont,
     QImage,
     QPainter,
@@ -29,66 +28,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-# ── Стили ──
-
-COMBOBOX_STYLE = """
-    QComboBox {
-        background-color: #333; color: white;
-        border: 1px solid #444; border-radius: 6px;
-        padding: 4px 28px 4px 10px; min-width: 100px; font-size: 13px;
-    }
-    QComboBox:hover { border: 1px solid #555; }
-    QComboBox::drop-down {
-        subcontrol-origin: padding; subcontrol-position: center right;
-        width: 24px; border: none; background: transparent;
-    }
-    QComboBox::down-arrow {
-        image: none; border-left: 5px solid transparent;
-        border-right: 5px solid transparent;
-        border-top: 6px solid #aaa; margin-right: 6px;
-    }
-    QComboBox QAbstractItemView {
-        background-color: #2d2d30; color: white;
-        border: 1px solid #3e3e42; selection-background-color: #3e3e42;
-        selection-color: white; outline: none; padding: 2px 0px;
-    }
-    QComboBox QAbstractItemView::item {
-        padding: 6px 10px; min-height: 24px;
-        background-color: transparent; color: white;
-    }
-    QComboBox QAbstractItemView::item:hover { background-color: #3e3e42; }
-    QComboBox QAbstractItemView::item:selected { background-color: #2ea043; }
-"""
-
-FONT_COMBO_STYLE = """
-    QFontComboBox {
-        background-color: #333; color: white;
-        border: 1px solid #444; border-radius: 6px;
-        padding: 4px 28px 4px 10px; font-size: 13px;
-    }
-    QFontComboBox:hover { border: 1px solid #555; }
-    QFontComboBox::drop-down {
-        subcontrol-origin: padding; subcontrol-position: center right;
-        width: 24px; border: none; background: transparent;
-    }
-    QFontComboBox::down-arrow {
-        image: none; border-left: 5px solid transparent;
-        border-right: 5px solid transparent;
-        border-top: 6px solid #aaa; margin-right: 6px;
-    }
-    QFontComboBox QAbstractItemView {
-        background-color: #2d2d30; color: white;
-        border: 1px solid #3e3e42; selection-background-color: #3e3e42;
-        selection-color: white; outline: none;
-    }
-    QFontComboBox QAbstractItemView::item {
-        padding: 6px 10px; min-height: 24px;
-        background-color: transparent; color: white;
-    }
-    QFontComboBox QAbstractItemView::item:hover { background-color: #3e3e42; }
-    QFontComboBox QAbstractItemView::item:selected { background-color: #2ea043; }
-"""
 
 CHECKBOX_STYLE = """
     QCheckBox {
@@ -119,29 +58,91 @@ LABEL_STYLE = "color: #ccc; border: none; background: transparent;"
 
 SPINBOX_STYLE = """
     QSpinBox, QDoubleSpinBox {
-        background-color: #333; color: white;
-        border: 1px solid #444; border-radius: 6px;
-        padding: 4px 8px; font-size: 13px; min-width: 70px;
+        background-color: #333;
+        color: white;
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: 4px 8px;
+        font-size: 13px;
+        min-width: 70px;
     }
-    QSpinBox:hover, QDoubleSpinBox:hover { border: 1px solid #555; }
-    QSpinBox::up-button, QDoubleSpinBox::up-button,
-    QSpinBox::down-button, QDoubleSpinBox::down-button {
-        background: transparent; border: none; width: 16px;
+    QSpinBox:hover, QDoubleSpinBox:hover {
+        border: 1px solid #555;
     }
-    QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
-        image: none; border-left: 4px solid transparent;
-        border-right: 4px solid transparent; border-bottom: 5px solid #aaa;
+"""
+
+COMBO_STYLE = """
+    QComboBox {
+        background-color: #333;
+        color: white;
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: 4px 10px;
+        min-width: 80px;
+        font-size: 13px;
     }
-    QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
-        image: none; border-left: 4px solid transparent;
-        border-right: 4px solid transparent; border-top: 5px solid #aaa;
+    QComboBox:hover {
+        border: 1px solid #555;
+    }
+    QComboBox QAbstractItemView {
+        background-color: #2d2d30;
+        color: white;
+        border: 1px solid #3e3e42;
+        selection-background-color: #3e3e42;
+        selection-color: white;
+        outline: none;
+        padding: 2px 0px;
+    }
+    QComboBox QAbstractItemView::item {
+        padding: 6px 10px;
+        min-height: 24px;
+        background-color: transparent;
+        color: white;
+    }
+    QComboBox QAbstractItemView::item:hover {
+        background-color: #3e3e42;
+    }
+    QComboBox QAbstractItemView::item:selected {
+        background-color: #2ea043;
+    }
+"""
+
+FONT_COMBO_STYLE = """
+    QFontComboBox {
+        background-color: #333;
+        color: white;
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: 4px 10px;
+        font-size: 13px;
+    }
+    QFontComboBox:hover {
+        border: 1px solid #555;
+    }
+    QFontComboBox QAbstractItemView {
+        background-color: #2d2d30;
+        color: white;
+        border: 1px solid #3e3e42;
+        selection-background-color: #3e3e42;
+        selection-color: white;
+        outline: none;
+    }
+    QFontComboBox QAbstractItemView::item {
+        padding: 6px 10px;
+        min-height: 24px;
+        background-color: transparent;
+        color: white;
+    }
+    QFontComboBox QAbstractItemView::item:hover {
+        background-color: #3e3e42;
+    }
+    QFontComboBox QAbstractItemView::item:selected {
+        background-color: #2ea043;
     }
 """
 
 SCROLLAREA_STYLE = """
-    QScrollArea {
-        background: transparent; border: none;
-    }
+    QScrollArea { background: transparent; border: none; }
     QScrollBar:vertical {
         background: #2d2d30; width: 8px; border: none; border-radius: 4px;
     }
@@ -155,8 +156,6 @@ SCROLLAREA_STYLE = """
 
 
 class CompassRoseData:
-    """Данные компасной розы (эллипс)."""
-
     def __init__(
         self,
         enabled=False,
@@ -171,23 +170,20 @@ class CompassRoseData:
         self.enabled = enabled
         self.x = x
         self.y = y
-        self.rx = rx  # горизонтальный радиус эллипса
-        self.ry = ry  # вертикальный радиус эллипса
+        self.rx = rx
+        self.ry = ry
         self.rotation = rotation
         self.font_family = font_family
-        self.font_size = font_size  # 0 = авто
+        self.font_size = font_size
 
 
 class PreviewWidget(QWidget):
-    """Предпросмотр с интерактивным компасом-эллипсом и 8 ручками."""
-
     compass_changed = Signal()
 
     HANDLE_SIZE = 8
     ROTATE_HANDLE_DISTANCE = 22
     ROTATE_HANDLE_RADIUS = 5
 
-    # Индексы ручек: 0-3 углы (TL, TR, BR, BL), 4-7 стороны (T, R, B, L)
     H_TL, H_TR, H_BR, H_BL = 0, 1, 2, 3
     H_T, H_R, H_B, H_L = 4, 5, 6, 7
 
@@ -199,6 +195,7 @@ class PreviewWidget(QWidget):
 
         self._preview_image: Optional[QImage] = None
         self._video_size: Tuple[int, int] = (640, 480)
+        self._export_size: Tuple[int, int] = (640, 480)
         self.compass = CompassRoseData()
 
         self._selected = False
@@ -221,66 +218,88 @@ class PreviewWidget(QWidget):
     def set_video_size(self, w: int, h: int):
         self._video_size = (w, h)
 
-    # ── Координаты ──
+    def set_export_size(self, w: int, h: int):
+        self._export_size = (w, h)
+        self.update()
 
     def _get_transform(self):
-        vw, vh = self._video_size
-        if vw == 0 or vh == 0:
+        ew, eh = self._export_size
+        if ew == 0 or eh == 0:
             return 1.0, 0.0, 0.0
         ww, wh = self.width(), self.height()
-        s = min(ww / vw, wh / vh)
-        return s, (ww - vw * s) / 2, (wh - vh * s) / 2
+        s = min(ww / ew, wh / eh)
+        return s, (ww - ew * s) / 2, (wh - eh * s) / 2
 
     def _v2w(self, vx, vy):
+        """Координаты видео → координаты виджета (с учётом export size)."""
+        ew, eh = self._export_size
+        vw, vh = self._video_size
+        if vw == 0 or vh == 0:
+            return QPointF(0, 0)
+        # Пересчёт координат видео в координаты экспорта
+        ex = vx * ew / vw
+        ey = vy * eh / vh
         s, ox, oy = self._get_transform()
-        return QPointF(vx * s + ox, vy * s + oy)
+        return QPointF(ex * s + ox, ey * s + oy)
 
     def _w2v(self, wx, wy):
+        """Координаты виджета → координаты видео."""
         s, ox, oy = self._get_transform()
-        return QPointF((wx - ox) / s, (wy - oy) / s) if s else QPointF(0, 0)
+        if s == 0:
+            return QPointF(0, 0)
+        ew, eh = self._export_size
+        vw, vh = self._video_size
+        if ew == 0 or eh == 0:
+            return QPointF(0, 0)
+        ex = (wx - ox) / s
+        ey = (wy - oy) / s
+        return QPointF(ex * vw / ew, ey * vh / eh)
 
     def _screen_center(self):
         return self._v2w(self.compass.x, self.compass.y)
 
     def _screen_rx(self):
+        ew, eh = self._export_size
+        vw, vh = self._video_size
         s, _, _ = self._get_transform()
-        return self.compass.rx * s
+        if vw == 0:
+            return 0
+        return self.compass.rx * (ew / vw) * s
 
     def _screen_ry(self):
+        ew, eh = self._export_size
+        vw, vh = self._video_size
         s, _, _ = self._get_transform()
-        return self.compass.ry * s
+        if vh == 0:
+            return 0
+        return self.compass.ry * (eh / vh) * s
 
-    # ── Ручки ──
-
-    def _handle_positions(self) -> List[QPointF]:
-        """8 позиций ручек вокруг bounding box эллипса."""
+    def _handle_positions(self):
         c = self._screen_center()
         rx, ry = self._screen_rx(), self._screen_ry()
         cx, cy = c.x(), c.y()
         return [
-            QPointF(cx - rx, cy - ry),  # TL
-            QPointF(cx + rx, cy - ry),  # TR
-            QPointF(cx + rx, cy + ry),  # BR
-            QPointF(cx - rx, cy + ry),  # BL
-            QPointF(cx, cy - ry),  # T
-            QPointF(cx + rx, cy),  # R
-            QPointF(cx, cy + ry),  # B
-            QPointF(cx - rx, cy),  # L
+            QPointF(cx - rx, cy - ry),
+            QPointF(cx + rx, cy - ry),
+            QPointF(cx + rx, cy + ry),
+            QPointF(cx - rx, cy + ry),
+            QPointF(cx, cy - ry),
+            QPointF(cx + rx, cy),
+            QPointF(cx, cy + ry),
+            QPointF(cx - rx, cy),
         ]
 
-    def _handle_rects(self) -> List[QRectF]:
+    def _handle_rects(self):
         hs = self.HANDLE_SIZE
         half = hs / 2
         return [
             QRectF(p.x() - half, p.y() - half, hs, hs) for p in self._handle_positions()
         ]
 
-    def _rotate_handle_center(self) -> QPointF:
+    def _rotate_handle_center(self):
         c = self._screen_center()
         ry = self._screen_ry()
         return QPointF(c.x(), c.y() - ry - self.ROTATE_HANDLE_DISTANCE)
-
-    # ── Отрисовка ──
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -288,8 +307,8 @@ class PreviewWidget(QWidget):
         p.fillRect(self.rect(), QColor("#1e1e1e"))
 
         s, ox, oy = self._get_transform()
-        vw, vh = self._video_size
-        img_rect = QRectF(ox, oy, vw * s, vh * s)
+        ew, eh = self._export_size
+        img_rect = QRectF(ox, oy, ew * s, eh * s)
         p.fillRect(img_rect, QColor("#FFFFFF"))
 
         if self._preview_image and not self._preview_image.isNull():
@@ -300,33 +319,26 @@ class PreviewWidget(QWidget):
 
         p.end()
 
-    def _draw_handles(self, p: QPainter):
+    def _draw_handles(self, p):
         c = self._screen_center()
         rx, ry = self._screen_rx(), self._screen_ry()
 
-        # Пунктирная рамка
         p.setPen(QPen(QColor("#4a9eff"), 1, Qt.DashLine))
         p.setBrush(Qt.NoBrush)
         p.drawRect(QRectF(c.x() - rx, c.y() - ry, rx * 2, ry * 2))
 
-        # 8 ручек
         p.setPen(QPen(QColor("#4a9eff"), 1))
         p.setBrush(QColor("#FFFFFF"))
         for rect in self._handle_rects():
             p.drawRect(rect)
 
-        # Линия к ручке вращения
         rot_c = self._rotate_handle_center()
         p.setPen(QPen(QColor("#4a9eff"), 1))
         p.drawLine(QPointF(c.x(), c.y() - ry), rot_c)
-
-        # Ручка вращения
         p.setBrush(QColor("#FFFFFF"))
         p.drawEllipse(rot_c, self.ROTATE_HANDLE_RADIUS, self.ROTATE_HANDLE_RADIUS)
 
-    # ── Hit test ──
-
-    def _hit_handle(self, pos) -> int:
+    def _hit_handle(self, pos):
         if not self._selected:
             return -1
         for i, r in enumerate(self._handle_rects()):
@@ -334,7 +346,7 @@ class PreviewWidget(QWidget):
                 return i
         return -1
 
-    def _hit_rotate(self, pos) -> bool:
+    def _hit_rotate(self, pos):
         if not self._selected:
             return False
         rc = self._rotate_handle_center()
@@ -343,7 +355,7 @@ class PreviewWidget(QWidget):
             <= self.ROTATE_HANDLE_RADIUS + 5
         )
 
-    def _hit_body(self, pos) -> bool:
+    def _hit_body(self, pos):
         c = self._screen_center()
         rx, ry = self._screen_rx(), self._screen_ry()
         if rx == 0 or ry == 0:
@@ -352,10 +364,8 @@ class PreviewWidget(QWidget):
         dy = (pos.y() - c.y()) / ry
         return (dx * dx + dy * dy) <= 1.0
 
-    # ── Курсоры ──
-
     @staticmethod
-    def _cursor_for_handle(h: int):
+    def _cursor_for_handle(h):
         if h in (0, 2):
             return Qt.SizeFDiagCursor
         if h in (1, 3):
@@ -366,12 +376,9 @@ class PreviewWidget(QWidget):
             return Qt.SizeHorCursor
         return Qt.ArrowCursor
 
-    # ── Мышь ──
-
     def mousePressEvent(self, ev):
         if not self.compass.enabled or ev.button() != Qt.LeftButton:
             return super().mousePressEvent(ev)
-
         pos = ev.position()
 
         if self._hit_rotate(pos):
@@ -421,15 +428,17 @@ class PreviewWidget(QWidget):
             return
 
         if self._resizing:
+            vw, vh = self._video_size
+            ew, eh = self._export_size
             s, _, _ = self._get_transform()
-            if s == 0:
+            if s == 0 or vw == 0 or vh == 0:
                 return
-            dx = (pos.x() - self._resize_start_pos.x()) / s
-            dy = (pos.y() - self._resize_start_pos.y()) / s
+            # Дельта в координатах видео
+            dx = (pos.x() - self._resize_start_pos.x()) / s / (ew / vw)
+            dy = (pos.y() - self._resize_start_pos.y()) / s / (eh / vh)
             h = self._resize_handle
 
-            new_rx = self._resize_start_rx
-            new_ry = self._resize_start_ry
+            new_rx, new_ry = self._resize_start_rx, self._resize_start_ry
 
             if h == self.H_TL:
                 new_rx = max(10, self._resize_start_rx - dx)
@@ -468,7 +477,6 @@ class PreviewWidget(QWidget):
             self.update()
             return
 
-        # Курсоры при наведении
         if self.compass.enabled:
             if self._hit_rotate(pos):
                 self.setCursor(Qt.SizeAllCursor)
@@ -498,15 +506,15 @@ class PreviewWidget(QWidget):
 class TrajectoryExportDialog(QDialog):
     export_clicked = Signal(dict)
 
-    _EDGE_MARGIN = 8  # зона захвата для ресайза окна
+    _EDGE_MARGIN = 8
 
     def __init__(
         self,
-        geometry_items: List,
-        tracking_data: Dict = None,
-        video_size: Tuple[int, int] = (640, 480),
-        current_frame: int = None,
-        compass_settings: dict = None,
+        geometry_items,
+        tracking_data=None,
+        video_size=(640, 480),
+        current_frame=None,
+        compass_settings=None,
         parent=None,
     ):
         super().__init__(parent)
@@ -522,11 +530,11 @@ class TrajectoryExportDialog(QDialog):
         self.setMinimumSize(700, 450)
         self.resize(960, 580)
 
-        # Для перемещения/ресайза окна
         self._move_drag = False
         self._resize_drag = False
         self._drag_pos = QPointF()
-        self._resize_edge = 0  # битовая маска: 1=left, 2=right, 4=top, 8=bottom
+        self._resize_edge = 0
+        self._lock_aspect = True
 
         self._init_ui()
 
@@ -535,9 +543,9 @@ class TrajectoryExportDialog(QDialog):
 
         self._schedule_preview_update()
 
-    # ── Перемещение и ресайз окна ──
+    # ── Перемещение/ресайз окна ──
 
-    def _edge_at(self, pos) -> int:
+    def _edge_at(self, pos):
         m = self._EDGE_MARGIN
         edge = 0
         if pos.x() < m:
@@ -551,10 +559,10 @@ class TrajectoryExportDialog(QDialog):
         return edge
 
     @staticmethod
-    def _edge_cursor(edge: int):
-        if edge in (1 | 4, 2 | 8):
+    def _edge_cursor(edge):
+        if edge in (5, 10):
             return Qt.SizeFDiagCursor
-        if edge in (2 | 4, 1 | 8):
+        if edge in (6, 9):
             return Qt.SizeBDiagCursor
         if edge in (1, 2):
             return Qt.SizeHorCursor
@@ -571,39 +579,36 @@ class TrajectoryExportDialog(QDialog):
                 self._drag_pos = ev.globalPosition()
                 self._drag_geom = self.geometry()
                 return
-
-            # Перетаскивание за верхнюю полосу (40 px)
             if ev.position().y() < 40:
                 self._move_drag = True
                 self._drag_pos = ev.globalPosition() - QPointF(self.pos())
                 return
-
         super().mousePressEvent(ev)
 
     def mouseMoveEvent(self, ev):
         if self._resize_drag:
             delta = ev.globalPosition() - self._drag_pos
             g = self._drag_geom
-            new_geom = QRectF(g)
+            r = QRectF(g)
             e = self._resize_edge
             if e & 1:
-                new_geom.setLeft(g.left() + delta.x())
+                r.setLeft(g.left() + delta.x())
             if e & 2:
-                new_geom.setRight(g.right() + delta.x())
+                r.setRight(g.right() + delta.x())
             if e & 4:
-                new_geom.setTop(g.top() + delta.y())
+                r.setTop(g.top() + delta.y())
             if e & 8:
-                new_geom.setBottom(g.bottom() + delta.y())
-            r = new_geom.toRect()
-            if r.width() >= self.minimumWidth() and r.height() >= self.minimumHeight():
-                self.setGeometry(r)
+                r.setBottom(g.bottom() + delta.y())
+            ri = r.toRect()
+            if (
+                ri.width() >= self.minimumWidth()
+                and ri.height() >= self.minimumHeight()
+            ):
+                self.setGeometry(ri)
             return
-
         if self._move_drag:
             self.move((ev.globalPosition() - self._drag_pos).toPoint())
             return
-
-        # Курсор при наведении на край
         edge = self._edge_at(ev.position())
         if edge:
             self.setCursor(self._edge_cursor(edge))
@@ -611,7 +616,6 @@ class TrajectoryExportDialog(QDialog):
             self.setCursor(Qt.OpenHandCursor)
         else:
             self.setCursor(Qt.ArrowCursor)
-
         super().mouseMoveEvent(ev)
 
     def mouseReleaseEvent(self, ev):
@@ -620,9 +624,9 @@ class TrajectoryExportDialog(QDialog):
         self.setCursor(Qt.ArrowCursor)
         super().mouseReleaseEvent(ev)
 
-    # ── Apply saved settings ──
+    # ── Settings ──
 
-    def _apply_compass_settings(self, s: dict):
+    def _apply_compass_settings(self, s):
         self.chk_compass.setChecked(s.get("enabled", False))
         self.spin_compass_x.setValue(s.get("x", 50))
         self.spin_compass_y.setValue(s.get("y", 50))
@@ -633,16 +637,15 @@ class TrajectoryExportDialog(QDialog):
         self.spin_font_size.setValue(s.get("font_size", 0))
         self._sync_compass_from_spins()
 
-    # ── Фабрики виджетов ──
+    # ── Factories ──
 
     def _make_combo(self, items, default):
         c = QComboBox()
         c.addItems(items)
         c.setCurrentText(default)
         c.setFixedHeight(34)
-        c.setMinimumWidth(120)
-        c.setStyleSheet(COMBOBOX_STYLE)
-        c.setFocusPolicy(Qt.StrongFocus)
+        c.setMinimumWidth(80)
+        c.setStyleSheet(COMBO_STYLE)
         return c
 
     def _make_row(self, label_text, widget):
@@ -696,8 +699,8 @@ class TrajectoryExportDialog(QDialog):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        # Контейнер всего окна (для скруглённых углов)
         shell = QFrame(self)
+        shell.setObjectName("dialogShell")
         shell.setStyleSheet("""
             QFrame#dialogShell {
                 background-color: #252526;
@@ -705,72 +708,102 @@ class TrajectoryExportDialog(QDialog):
                 border-radius: 12px;
             }
         """)
-        shell.setObjectName("dialogShell")
         shell_layout = QHBoxLayout(shell)
         shell_layout.setContentsMargins(0, 0, 0, 0)
         shell_layout.setSpacing(0)
 
-        # ═══ Левая панель: Предпросмотр ═══
-        preview_frame = QFrame()
-        preview_frame.setStyleSheet(
+        # ═══ Левая панель ═══
+        pf = QFrame()
+        pf.setStyleSheet(
             "background: #1e1e1e; border: none; border-radius: 12px 0 0 12px;"
         )
-        pv_layout = QVBoxLayout(preview_frame)
-        pv_layout.setContentsMargins(8, 8, 4, 8)
-        pv_layout.setSpacing(4)
+        pvl = QVBoxLayout(pf)
+        pvl.setContentsMargins(8, 8, 4, 8)
+        pvl.setSpacing(4)
 
         lbl_pv = QLabel("Предпросмотр")
         lbl_pv.setFont(QFont("Segoe UI", 11))
         lbl_pv.setStyleSheet("color:#666; background:transparent;")
         lbl_pv.setAlignment(Qt.AlignCenter)
-        pv_layout.addWidget(lbl_pv)
+        pvl.addWidget(lbl_pv)
 
         self.preview_widget = PreviewWidget()
         self.preview_widget.set_video_size(*self.video_size)
+        self.preview_widget.set_export_size(*self.video_size)
         self.preview_widget.compass_changed.connect(self._on_compass_changed_in_preview)
-        pv_layout.addWidget(self.preview_widget, 1)
+        pvl.addWidget(self.preview_widget, 1)
 
-        shell_layout.addWidget(preview_frame, 1)
+        # Лейбл размера
+        self.lbl_size_info = QLabel("")
+        self.lbl_size_info.setStyleSheet(
+            "color: #555; background: transparent; font-size: 11px;"
+        )
+        self.lbl_size_info.setAlignment(Qt.AlignCenter)
+        pvl.addWidget(self.lbl_size_info)
 
-        # ═══ Правая панель (скроллируемая) ═══
-        right_frame = QFrame()
-        right_frame.setFixedWidth(420)
-        right_frame.setStyleSheet(
+        shell_layout.addWidget(pf, 1)
+
+        # ═══ Правая панель ═══
+        rf = QFrame()
+        rf.setFixedWidth(420)
+        rf.setStyleSheet(
             "background: #252526; border: none; border-radius: 0 12px 12px 0;"
         )
 
-        right_outer = QVBoxLayout(right_frame)
-        right_outer.setContentsMargins(0, 0, 0, 0)
-        right_outer.setSpacing(0)
+        ro = QVBoxLayout(rf)
+        ro.setContentsMargins(0, 0, 0, 0)
+        ro.setSpacing(0)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setStyleSheet(SCROLLAREA_STYLE)
 
-        scroll_content = QWidget()
-        layout = QVBoxLayout(scroll_content)
+        sc = QWidget()
+        layout = QVBoxLayout(sc)
         layout.setContentsMargins(24, 24, 24, 12)
         layout.setSpacing(12)
 
-        # Заголовок
         title = QLabel("Экспорт траектории")
         title.setFont(QFont("Segoe UI", 16, QFont.Bold))
         title.setStyleSheet("color: white; background: transparent;")
         layout.addWidget(title)
 
-        # Формат / Масштаб / Сглаживание
-        self.combo_format = self._make_combo(["SVG", "PNG", "JPG"], "SVG")
+        # Формат
+        self.combo_format = self._make_combo(["SVG", "PNG", "JPG"], "PNG")
         self.combo_format.currentTextChanged.connect(self._schedule_preview_update)
         layout.addLayout(self._make_row("Формат:", self.combo_format))
 
-        self.combo_scale = self._make_combo(["1x", "2x", "4x", "8x"], "1x")
-        self.combo_scale.currentTextChanged.connect(self._schedule_preview_update)
-        layout.addLayout(self._make_row("Масштаб:", self.combo_scale))
-
+        # Сглаживание
         self.combo_smoothing = self._make_combo(["Нет", "Да"], "Да")
         self.combo_smoothing.currentTextChanged.connect(self._schedule_preview_update)
         layout.addLayout(self._make_row("Сглаживание:", self.combo_smoothing))
+
+        # ═══ Размер экспорта ═══
+        size_group = QGroupBox("Размер экспорта")
+        size_group.setStyleSheet(GROUPBOX_STYLE)
+        size_layout = QVBoxLayout()
+        size_layout.setSpacing(6)
+        size_layout.setContentsMargins(4, 4, 4, 4)
+
+        vw, vh = self.video_size
+
+        self.spin_export_w = self._make_spin_int(1, 16384, vw, " px")
+        self.spin_export_w.valueChanged.connect(self._on_export_width_changed)
+        size_layout.addLayout(self._param_row("Ширина:", self.spin_export_w))
+
+        self.spin_export_h = self._make_spin_int(1, 16384, vh, " px")
+        self.spin_export_h.valueChanged.connect(self._on_export_height_changed)
+        size_layout.addLayout(self._param_row("Высота:", self.spin_export_h))
+
+        self.chk_lock_aspect = QCheckBox("Сохранять пропорции")
+        self.chk_lock_aspect.setChecked(True)
+        self.chk_lock_aspect.setStyleSheet(CHECKBOX_STYLE)
+        self.chk_lock_aspect.toggled.connect(self._on_lock_aspect_changed)
+        size_layout.addWidget(self.chk_lock_aspect)
+
+        size_group.setLayout(size_layout)
+        layout.addWidget(size_group)
 
         # Отображение
         grp_show = QGroupBox("Отображение")
@@ -824,7 +857,6 @@ class TrajectoryExportDialog(QDialog):
         self.chk_compass.stateChanged.connect(self._on_compass_enabled_changed)
         cl.addWidget(self.chk_compass)
 
-        # Позиция
         self.spin_compass_x = self._make_spin_int(0, 10000, 50, " px")
         self.spin_compass_x.setEnabled(False)
         self.spin_compass_x.valueChanged.connect(self._on_compass_spin_changed)
@@ -835,7 +867,6 @@ class TrajectoryExportDialog(QDialog):
         self.spin_compass_y.valueChanged.connect(self._on_compass_spin_changed)
         cl.addLayout(self._param_row("Y:", self.spin_compass_y))
 
-        # Радиусы эллипса
         self.spin_compass_rx = self._make_spin_int(10, 5000, 30, " px")
         self.spin_compass_rx.setEnabled(False)
         self.spin_compass_rx.valueChanged.connect(self._on_compass_spin_changed)
@@ -851,13 +882,11 @@ class TrajectoryExportDialog(QDialog):
         self.spin_compass_rotation.valueChanged.connect(self._on_compass_spin_changed)
         cl.addLayout(self._param_row("Поворот:", self.spin_compass_rotation))
 
-        # Разделитель
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
         sep.setStyleSheet("background-color: #3e3e42; border: none; max-height: 1px;")
         cl.addWidget(sep)
 
-        # Шрифт
         lbl_fh = QLabel("Шрифт подписей")
         lbl_fh.setStyleSheet(
             "color: #999; background: transparent; font-size: 11px; border: none;"
@@ -883,51 +912,79 @@ class TrajectoryExportDialog(QDialog):
 
         layout.addStretch()
 
-        scroll.setWidget(scroll_content)
-        right_outer.addWidget(scroll, 1)
+        scroll.setWidget(sc)
+        ro.addWidget(scroll, 1)
 
-        # Кнопки (вне скролла)
+        # Кнопки
         btn_bar = QWidget()
         btn_bar.setStyleSheet("background: transparent;")
-        btn_layout = QHBoxLayout(btn_bar)
-        btn_layout.setContentsMargins(24, 8, 24, 16)
-        btn_layout.setSpacing(10)
+        bl = QHBoxLayout(btn_bar)
+        bl.setContentsMargins(24, 8, 24, 16)
+        bl.setSpacing(10)
 
-        self.btn_cancel = QPushButton("Отмена")
-        self.btn_cancel.setCursor(Qt.PointingHandCursor)
-        self.btn_cancel.setFixedHeight(36)
-        self.btn_cancel.setFont(QFont("Segoe UI", 13, QFont.Bold))
-        self.btn_cancel.clicked.connect(self.reject)
-        self.btn_cancel.setStyleSheet("""
-            QPushButton {
-                background-color: transparent; color: #aaa;
-                border: 1px solid #444; border-radius: 6px;
-                font-weight: bold; padding: 0 16px;
-            }
+        btn_cancel = QPushButton("Отмена")
+        btn_cancel.setCursor(Qt.PointingHandCursor)
+        btn_cancel.setFixedHeight(36)
+        btn_cancel.setFont(QFont("Segoe UI", 13, QFont.Bold))
+        btn_cancel.clicked.connect(self.reject)
+        btn_cancel.setStyleSheet("""
+            QPushButton { background-color: transparent; color: #aaa;
+                border: 1px solid #444; border-radius: 6px; font-weight: bold; padding: 0 16px; }
             QPushButton:hover { background-color: #333; color: white; border: 1px solid #555; }
         """)
 
-        self.btn_export = QPushButton("Экспорт")
-        self.btn_export.setCursor(Qt.PointingHandCursor)
-        self.btn_export.setFixedHeight(36)
-        self.btn_export.setFont(QFont("Segoe UI", 13, QFont.Bold))
-        self.btn_export.clicked.connect(self._on_export_clicked)
-        self.btn_export.setStyleSheet("""
-            QPushButton {
-                background-color: #2ea043; color: white;
-                border: none; border-radius: 6px;
-                font-weight: bold; padding: 0 16px;
-            }
+        btn_export = QPushButton("Экспорт")
+        btn_export.setCursor(Qt.PointingHandCursor)
+        btn_export.setFixedHeight(36)
+        btn_export.setFont(QFont("Segoe UI", 13, QFont.Bold))
+        btn_export.clicked.connect(self._on_export_clicked)
+        btn_export.setStyleSheet("""
+            QPushButton { background-color: #2ea043; color: white;
+                border: none; border-radius: 6px; font-weight: bold; padding: 0 16px; }
             QPushButton:hover { background-color: #3ab654; }
             QPushButton:pressed { background-color: #238636; }
         """)
 
-        btn_layout.addWidget(self.btn_cancel)
-        btn_layout.addWidget(self.btn_export)
-        right_outer.addWidget(btn_bar)
+        bl.addWidget(btn_cancel)
+        bl.addWidget(btn_export)
+        ro.addWidget(btn_bar)
 
-        shell_layout.addWidget(right_frame)
+        shell_layout.addWidget(rf)
         outer.addWidget(shell)
+
+    # ── Export size ──
+
+    def _on_lock_aspect_changed(self, checked):
+        self._lock_aspect = checked
+
+    def _on_export_width_changed(self, val):
+        if self._lock_aspect:
+            vw, vh = self.video_size
+            if vw > 0:
+                ratio = vh / vw
+                new_h = int(val * ratio)
+                self.spin_export_h.blockSignals(True)
+                self.spin_export_h.setValue(new_h)
+                self.spin_export_h.blockSignals(False)
+        self._on_export_size_changed()
+
+    def _on_export_height_changed(self, val):
+        if self._lock_aspect:
+            vw, vh = self.video_size
+            if vh > 0:
+                ratio = vw / vh
+                new_w = int(val * ratio)
+                self.spin_export_w.blockSignals(True)
+                self.spin_export_w.setValue(new_w)
+                self.spin_export_w.blockSignals(False)
+        self._on_export_size_changed()
+
+    def _on_export_size_changed(self):
+        ew = self.spin_export_w.value()
+        eh = self.spin_export_h.value()
+        self.preview_widget.set_export_size(ew, eh)
+        self.lbl_size_info.setText(f"{ew} × {eh}")
+        self._schedule_preview_update()
 
     # ── Compass sync ──
 
@@ -1004,7 +1061,7 @@ class TrajectoryExportDialog(QDialog):
     def _schedule_preview_update(self):
         QTimer.singleShot(50, self._update_preview)
 
-    def _build_compass_data(self) -> Optional[dict]:
+    def _build_compass_data(self):
         if not self.chk_compass.isChecked():
             return None
         return {
@@ -1021,12 +1078,14 @@ class TrajectoryExportDialog(QDialog):
         from src.services.trajectory_export_service import TrajectoryExportService
 
         sel = [n for n, ch in self.geometry_checks.items() if ch.isChecked()]
+        ew = self.spin_export_w.value()
+        eh = self.spin_export_h.value()
 
         img = TrajectoryExportService.render_image(
             tracking_data=self.tracking_data,
             geometry_items=self.geometry_items,
             video_size=self.video_size,
-            scale=1,
+            export_size=(ew, eh),
             show_trajectory=self.chk_trajectory.isChecked(),
             show_geometry=self.chk_geometry.isChecked(),
             selected_geometry_names=sel,
@@ -1036,9 +1095,11 @@ class TrajectoryExportDialog(QDialog):
         )
         self.preview_widget.set_preview_image(img)
 
+        self.lbl_size_info.setText(f"{ew} × {eh}")
+
     # ── Export ──
 
-    def get_compass_settings(self) -> dict:
+    def get_compass_settings(self):
         return {
             "enabled": self.chk_compass.isChecked(),
             "x": self.spin_compass_x.value(),
@@ -1052,7 +1113,6 @@ class TrajectoryExportDialog(QDialog):
 
     def _on_export_clicked(self):
         fmt = self.combo_format.currentText()
-        scale = int(self.combo_scale.currentText().replace("x", ""))
         sel = [n for n, ch in self.geometry_checks.items() if ch.isChecked()]
 
         ext_map = {
@@ -1070,7 +1130,8 @@ class TrajectoryExportDialog(QDialog):
 
         options = {
             "format": fmt.lower(),
-            "scale": scale,
+            "export_width": self.spin_export_w.value(),
+            "export_height": self.spin_export_h.value(),
             "smoothing": self.combo_smoothing.currentText(),
             "show_trajectory": self.chk_trajectory.isChecked(),
             "show_geometry": self.chk_geometry.isChecked(),

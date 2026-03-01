@@ -22,9 +22,62 @@ class Project:
         self._videos = []
         self._is_loaded = False
         self._compass_settings = {}
-        self._scale_factor = 0.0  # 0 = калибровка не проведена
+        self._scale_factor = 0.0
+        self._export_settings = {}
+
+        self.__read_config()
 
         self.reload_videos()
+
+    def __read_config(self):
+        config_file = self._path / ".morris" / "project.yaml"
+        if config_file.exists():
+            try:
+                with open(config_file, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+                    if "name" in data:
+                        self._name = data["name"]
+                    if "compass" in data:
+                        self._compass_settings = data["compass"]
+                    if "scale_factor" in data:
+                        self._scale_factor = float(data["scale_factor"])
+                    if "export_settings" in data:
+                        self._export_settings = data["export_settings"]
+            except Exception:
+                pass
+
+    def save_config(self):
+        config_dir = self._path / ".morris"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        config_file = config_dir / "project.yaml"
+
+        existing_data = {}
+        if config_file.exists():
+            try:
+                with open(config_file, "r", encoding="utf-8") as f:
+                    existing_data = yaml.safe_load(f) or {}
+            except Exception:
+                pass
+
+        existing_data["name"] = self._name
+        existing_data["scale_factor"] = self._scale_factor
+
+        if self._compass_settings:
+            existing_data["compass"] = self._compass_settings
+
+        # Всегда сохраняем export_settings, даже пустой
+        existing_data["export_settings"] = self._export_settings
+
+        with open(config_file, "w", encoding="utf-8") as f:
+            yaml.dump(existing_data, f, default_flow_style=False, allow_unicode=True)
+
+    @property
+    def export_settings(self) -> dict:
+        return self._export_settings
+
+    @export_settings.setter
+    def export_settings(self, value: dict):
+        self._export_settings = value
 
     def reload_videos(self):
         self._videos = []
@@ -43,48 +96,12 @@ class Project:
         self.__scan_videos()
         self._is_loaded = True
 
-    def __read_config(self):
-        config_file = self._path / ".morris" / "project.yaml"
-        if config_file.exists():
-            try:
-                with open(config_file, "r", encoding="utf-8") as f:
-                    data = yaml.safe_load(f) or {}
-                    if "name" in data:
-                        self._name = data["name"]
-                    if "compass" in data:
-                        self._compass_settings = data["compass"]
-                    if "scale_factor" in data:
-                        self._scale_factor = float(data["scale_factor"])
-            except Exception:
-                pass
-
     def __scan_videos(self):
         self._videos = []
         for file_path in self._path.iterdir():
             if file_path.is_file() and file_path.suffix.lower() in VIDEO_EXTENSIONS:
                 self._videos.append(Video(str(file_path)))
         self._videos.sort(key=lambda v: Path(v.path).name)
-
-    def save_config(self):
-        config_dir = self._path / ".morris"
-        config_dir.mkdir(parents=True, exist_ok=True)
-        config_file = config_dir / "project.yaml"
-
-        existing_data = {}
-        if config_file.exists():
-            try:
-                with open(config_file, "r", encoding="utf-8") as f:
-                    existing_data = yaml.safe_load(f) or {}
-            except Exception:
-                pass
-
-        existing_data["name"] = self._name
-        if self._compass_settings:
-            existing_data["compass"] = self._compass_settings
-        existing_data["scale_factor"] = self._scale_factor
-
-        with open(config_file, "w", encoding="utf-8") as f:
-            yaml.dump(existing_data, f, default_flow_style=False, allow_unicode=True)
 
     @property
     def compass_settings(self) -> dict:

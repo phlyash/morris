@@ -505,6 +505,7 @@ class PreviewWidget(QWidget):
 
 class TrajectoryExportDialog(QDialog):
     export_clicked = Signal(dict)
+    settings_saved = Signal(dict)
 
     _EDGE_MARGIN = 8
 
@@ -515,6 +516,7 @@ class TrajectoryExportDialog(QDialog):
         video_size=(640, 480),
         current_frame=None,
         compass_settings=None,
+        export_settings=None,
         parent=None,
     ):
         super().__init__(parent)
@@ -538,7 +540,11 @@ class TrajectoryExportDialog(QDialog):
 
         self._init_ui()
 
-        if compass_settings:
+        # Применяем сохранённые настройки (export_settings включает compass)
+        if export_settings:
+            self._apply_export_settings(export_settings)
+        elif compass_settings:
+            # Фоллбэк: если нет export_settings, но есть отдельно compass
             self._apply_compass_settings(compass_settings)
 
         self._schedule_preview_update()
@@ -584,6 +590,11 @@ class TrajectoryExportDialog(QDialog):
                 self._drag_pos = ev.globalPosition() - QPointF(self.pos())
                 return
         super().mousePressEvent(ev)
+
+    def done(self, result):
+        """Вызывается при любом закрытии диалога (accept, reject, close)."""
+        self.settings_saved.emit(self.get_export_settings())
+        super().done(result)
 
     def mouseMoveEvent(self, ev):
         if self._resize_drag:
@@ -1141,3 +1152,78 @@ class TrajectoryExportDialog(QDialog):
         }
         self.export_clicked.emit(options)
         self.accept()
+
+    def _apply_export_settings(self, s: dict):
+        """Восстанавливает все настройки диалога."""
+        # Формат
+        fmt = s.get("format", "PNG")
+        if fmt.upper() in ("SVG", "PNG", "JPG"):
+            self.combo_format.blockSignals(True)
+            self.combo_format.setCurrentText(fmt.upper())
+            self.combo_format.blockSignals(False)
+
+        # Сглаживание
+        sm = s.get("smoothing", "Да")
+        if sm in ("Нет", "Да"):
+            self.combo_smoothing.blockSignals(True)
+            self.combo_smoothing.setCurrentText(sm)
+            self.combo_smoothing.blockSignals(False)
+
+        # Размер экспорта
+        vw, vh = self.video_size
+        ew = s.get("export_width", vw)
+        eh = s.get("export_height", vh)
+        lock = s.get("lock_aspect", True)
+
+        self.chk_lock_aspect.blockSignals(True)
+        self.chk_lock_aspect.setChecked(lock)
+        self._lock_aspect = lock
+        self.chk_lock_aspect.blockSignals(False)
+
+        self.spin_export_w.blockSignals(True)
+        self.spin_export_h.blockSignals(True)
+        self.spin_export_w.setValue(int(ew))
+        self.spin_export_h.setValue(int(eh))
+        self.spin_export_w.blockSignals(False)
+        self.spin_export_h.blockSignals(False)
+
+        self.preview_widget.set_export_size(int(ew), int(eh))
+        self.lbl_size_info.setText(f"{int(ew)} × {int(eh)}")
+
+        # Отображение
+        self.chk_trajectory.blockSignals(True)
+        self.chk_trajectory.setChecked(s.get("show_trajectory", True))
+        self.chk_trajectory.blockSignals(False)
+
+        self.chk_geometry.blockSignals(True)
+        self.chk_geometry.setChecked(s.get("show_geometry", True))
+        self.chk_geometry.blockSignals(False)
+
+        # Зоны геометрии
+        selected_zones = s.get("selected_geometries", None)
+        if selected_zones is not None:
+            for name, chk in self.geometry_checks.items():
+                chk.blockSignals(True)
+                chk.setChecked(name in selected_zones)
+                chk.blockSignals(False)
+
+        # Компас (вложен в export_settings)
+        compass = s.get("compass_settings")
+        if compass:
+            self._apply_compass_settings(compass)
+
+    def get_export_settings(self) -> dict:
+        """Возвращает все настройки диалога для сохранения."""
+        return {
+            "format": self.combo_format.currentText(),
+            "smoothing": self.combo_smoothing.currentText(),
+            "export_width": self.spin_export_w.value(),
+            "export_height": self.spin_export_h.value(),
+            "lock_aspect": self.chk_lock_aspect.isChecked(),
+            "show_trajectory": self.chk_trajectory.isChecked(),
+            "show_geometry": self.chk_geometry.isChecked(),
+            "selected_geometries": [
+                name for name, chk in self.geometry_checks.items() if chk.isChecked()
+            ],
+            "compass_settings": self.get_compass_settings(),
+        }

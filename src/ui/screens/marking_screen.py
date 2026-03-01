@@ -501,36 +501,7 @@ class VideoMarkingWidget(QWidget):
                 self.player.view.update_tracker_box(True, bbox)
         self.btn_status.setChecked(is_marked)
 
-    def _on_trajectory_clicked(self):
-        geometry_items = self.right_panel.geometry_page.get_all_items()
-        tracking_data = self.player.thread.tracking_data
-        current_frame = int(self.player.thread.cap.get(cv2.CAP_PROP_POS_FRAMES))
-
-        cap = cv2.VideoCapture(str(self.video.path))
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        cap.release()
-
-        compass_settings = (
-            self.project.compass_settings
-            if hasattr(self.project, "compass_settings")
-            else None
-        )
-
-        dialog = TrajectoryExportDialog(
-            geometry_items=geometry_items,
-            tracking_data=tracking_data,
-            video_size=(width, height),
-            current_frame=current_frame,
-            compass_settings=compass_settings,
-            parent=self,
-        )
-        dialog.export_clicked.connect(
-            lambda options: self._on_export_trajectory(options, dialog)
-        )
-        dialog.exec()
-
-    def _on_export_trajectory(self, options, dialog=None):
+    def _on_export_trajectory(self, options):
         tracking_data = self.player.thread.tracking_data
         geometry_items = self.right_panel.geometry_page.get_all_items()
 
@@ -544,11 +515,6 @@ class VideoMarkingWidget(QWidget):
             options.get("export_width", width),
             options.get("export_height", height),
         )
-
-        if dialog is not None:
-            compass_settings = dialog.get_compass_settings()
-            self.project.compass_settings = compass_settings
-            self.project.save_config()
 
         try:
             TrajectoryExportService.export_image(
@@ -567,6 +533,44 @@ class VideoMarkingWidget(QWidget):
             )
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось экспортировать: {str(e)}")
+
+    def _on_trajectory_clicked(self):
+        geometry_items = self.right_panel.geometry_page.get_all_items()
+        tracking_data = self.player.thread.tracking_data
+        current_frame = int(self.player.thread.cap.get(cv2.CAP_PROP_POS_FRAMES))
+
+        cap = cv2.VideoCapture(str(self.video.path))
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        cap.release()
+
+        export_settings = self.project.export_settings or {}
+        compass_settings = self.project.compass_settings or {}
+
+        dialog = TrajectoryExportDialog(
+            geometry_items=geometry_items,
+            tracking_data=tracking_data,
+            video_size=(width, height),
+            current_frame=current_frame,
+            compass_settings=compass_settings,
+            export_settings=export_settings,
+            parent=self,
+        )
+
+        # Сохраняем настройки при ЛЮБОМ закрытии диалога
+        dialog.settings_saved.connect(self._save_export_settings)
+        dialog.export_clicked.connect(
+            lambda options: self._on_export_trajectory(options)
+        )
+        dialog.exec()
+
+    def _save_export_settings(self, settings: dict):
+        """Сохраняет все настройки экспорта в проект."""
+        self.project.export_settings = settings
+        compass = settings.get("compass_settings")
+        if compass:
+            self.project.compass_settings = compass
+        self.project.save_config()
 
     def cleanup(self):
         if hasattr(self, "player"):
